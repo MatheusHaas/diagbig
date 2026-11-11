@@ -1,0 +1,114 @@
+﻿DiagBIG - roteiro de teste na VM Windows
+=========================================
+
+Antes de começar
+- Copie a pasta DiagBIG inteira para a VM (por exemplo, para C:\DiagBIG).
+- O DiagBIG pede elevação (UAC). Aceite.
+- Cada coleta grava DiagBIG_<PC>_<data_hora>.txt na pasta DiagBIG_relatorios, ao lado do .exe
+  (ou na Área de Trabalho\DiagBIG_relatorios, se não der para gravar ao lado do .exe).
+  Ficam só os 10 relatórios mais recentes de cada PC; os mais antigos são apagados.
+- Período padrão: 30 dias. Ele pode ser trocado na janela (7 / 30 / 90) antes de clicar em "Coletar novamente".
+- O nome do serviço do banco não importa: o DiagBIG acha qualquer serviço que rode mariadbd.exe ou mysqld.exe.
+  No MariaDB instalado no padrão, o serviço se chama "MariaDB" e o .err fica em
+  C:\Program Files\MariaDB <versão>\data\<NOMEDOPC>.err. Abaixo, <SERVIÇO> = nome mostrado em "Serviço" na seção BANCO.
+
+
+1) Rodar sem nada na VM
+   - Abra o DiagBIG.exe e espere terminar ("Pronto. TXT salvo em ...").
+   - Esperado no RESUMO: só OK ou NÃO VERIFICADO, nunca uma mensagem de erro/exceção.
+       DISCO: OK - nenhuma ocorrência no período
+       SMART: NÃO VERIFICADO - SMART não suportado / nenhum disco informou SMART (normal em VM)
+       DESLIGAMENTOS INESPERADOS: OK  (*)
+       LIGA/DESLIGA: OK - N inicializações, ...; ligado desde dd/mm/aaaa hh:mm
+       BANCO: NÃO VERIFICADO - nenhum serviço com mysqld.exe/mariadbd.exe ... (se não houver banco)
+       EVENTOS DO BANCO NO WINDOWS: OK - nenhuma ocorrência no período
+   - Confira o logo e o ícone na janela e no DiagBIG.exe (Explorer / barra de tarefas).
+   (*) Se a VM já foi desligada "na marra" no período, aparece ATENÇÃO com Kernel-Power 41 / EventLog 6008.
+       Isso está certo: é exatamente o que o item procura.
+
+
+2) Simular erro de disco
+   - Abra o Windows PowerShell COMO ADMINISTRADOR (o "powershell" que vem no Windows, não o "pwsh").
+   - Rode 3 vezes:
+       Write-EventLog -LogName System -Source disk -EventId 7 -EntryType Error -Message "teste"
+   - No DiagBIG, clique em "Coletar novamente".
+   - Esperado: DISCO: ATENÇÃO - 3 eventos (disk 7: 3x), último em <agora>
+
+
+3) Simular erro no .err do banco (MariaDB instalado na VM)
+   - Rode o DiagBIG uma vez e anote, na seção BANCO, o "Serviço" e o ".err usado".
+   - No PowerShell como administrador, acrescente linhas de erro com a data de agora
+     (são linhas de amostras\mariadb104_corrupcao.err, só que com a data atual):
+
+       $err = "C:\Program Files\MariaDB 11.4\data\NOMEDOPC.err"     # troque pelo ".err usado"
+       $agora = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+       Add-Content -Path $err -Value @(
+         "$agora 8 [ERROR] mysqld: Table '.\big\movimento' is marked as crashed and should be repaired",
+         "$agora 0 [ERROR] InnoDB: Database page corruption on disk or a failed file read of tablespace big/clientes page [page id: space=12, page number=3345]. You may have to recover from a backup.",
+         "$agora 15 [ERROR] mysqld: Disk full (teste.MAI); waiting for someone to free some space... (errno: 28 ""No space left on device"")"
+       )
+
+     Se o Add-Content reclamar que o arquivo está em uso: net stop <SERVIÇO>, rode o Add-Content, net start <SERVIÇO>.
+   - Clique em "Coletar novamente".
+   - Esperado: BANCO (<SERVIÇO>): ATENÇÃO - 3 ocorrências (...), última em <agora>
+
+
+4) .err renomeado / ausente
+   4a) Renomear COM o banco rodando (o que o suporte costuma fazer para "zerar" o log):
+       Rename-Item $err (Join-Path (Split-Path $err) ("old_" + (Split-Path $err -Leaf)))
+       Coletar de novo. Esperado:
+       - O banco continua gravando no old_*.err até o serviço reiniciar, então os erros continuam aparecendo.
+       - A seção BANCO mostra "AVISO: <PC>.err não existe; foi lido old_<PC>.err" e o RESUMO traz
+         "(lido old_<PC>.err porque <PC>.err não existe)".
+       Depois: net stop <SERVIÇO> / net start <SERVIÇO> e coletar de novo. Esperado:
+       - O banco cria um <PC>.err novo, que passa a ser o lido (sem os erros antigos).
+       - Aparece "AVISO: outro .err alterado no período, NÃO lido: ...old_<PC>.err" e o RESUMO avisa o mesmo.
+   4b) .err ausente: pare o serviço e renomeie para .bak (que não termina em .err):
+       net stop <SERVIÇO>
+       Rename-Item $err "$err.bak"
+       Coletar. Esperado: BANCO (<SERVIÇO>): NÃO VERIFICADO - .err não encontrado (esperado ...; nenhum .err em ...)
+       Obs.: se ainda houver um old_*.err na datadir, ele é usado (é o .err mais recente). Renomeie-o também.
+       Desfaça: Rename-Item "$err.bak" $err ; net start <SERVIÇO>
+
+
+5) Reinícios e desligamentos
+   5a) Reinicie a VM normalmente (Iniciar > Reiniciar) e colete. Na seção "2. REINÍCIOS E DESLIGAMENTOS",
+       a LINHA DO TEMPO deve mostrar, do mais recente para o mais antigo:
+         LIGOU (Windows iniciou)            EventLog 6005
+         DESLIGOU CORRETAMENTE              EventLog 6006
+         DESLIGAR/REINICIAR SOLICITADO      User32 1074  (com processo, usuário e motivo)
+       Com "Desligar" (não Reiniciar) no Windows 10/11 com Inicialização Rápida, aparecem SUSPENSÃO/VOLTOU
+       em vez de LIGOU/DESLIGOU. Está explicado no próprio TXT.
+   5b) Desligue a VM à força pelo hipervisor ("Desligar a máquina" / "Desligar", sem desligar o Windows),
+       ligue de novo e colete. Esperado:
+         DESLIGAMENTOS INESPERADOS: ATENÇÃO - 2 eventos (EventLog 6008: 1x, Kernel-Power 41: 1x) ...
+         LIGA/DESLIGA: ATENÇÃO - ..., 1 inesperado; ligado desde <agora>
+       e no Kernel-Power 41: "Interpretação: ... provável QUEDA/CORTE DE ENERGIA, reset ou travamento total".
+       O 6008 informa o horário em que o PC caiu ("O desligamento anterior do sistema às HH:MM em dd/mm foi inesperado").
+
+
+6) Modo sem janela
+   - No PowerShell como administrador, na pasta do DiagBIG:
+       .\DiagBIG.exe --sem-janela
+       .\DiagBIG.exe --sem-janela --dias 7
+   - Confira se um novo DiagBIG_<PC>_<data_hora>.txt apareceu em DiagBIG_relatorios
+     e se abre certo no Bloco de Notas (acentos ok).
+   - Limpeza: rode 12 vezes seguidas e confira que ficam só 10 arquivos (os mais recentes):
+       1..12 | ForEach-Object { Start-Process .\DiagBIG.exe -ArgumentList '--sem-janela' -Wait; Start-Sleep 1 }
+       (Get-ChildItem .\DiagBIG_relatorios\DiagBIG_*.txt).Count     # esperado: 10
+     Um arquivo com outro nome colocado nessa pasta (ex.: anotacoes.txt) não é apagado.
+
+
+7) Copiar
+   - "Copiar tudo" (aparece "Copiado!"), colar no Bloco de Notas: TXT inteiro.
+   - "Copiar resumo", colar no Bloco de Notas: só IDENTIFICAÇÃO, UNIDADES, COBERTURA e RESUMO, no máximo 3.500 caracteres.
+   - "Abrir TXT" (Bloco de Notas) e "Abrir pasta" (Explorer com o arquivo selecionado).
+   - "Ajuda (F1)" (ou tecla F1): abre o manual numa janela; Esc ou "Fechar" fecha.
+     O mesmo texto está em MANUAL-DiagBIG.txt, nesta pasta.
+
+
+Amostras (pasta amostras\)
+- mysql55_crash.err ........ MySQL 5.5: tabela crashed, Got error 145, chave incorreta, crash com stack.
+- mariadb104_corrupcao.err . MariaDB 10.4: página corrompida, tabela crashed, disco cheio, assertion.
+- mysql8_disco_cheio.err ... MySQL 8 (horário UTC): disco cheio, assertion + crash.
+- my_*.ini ................. my.ini com e sem log-error, caminhos com / e com \.

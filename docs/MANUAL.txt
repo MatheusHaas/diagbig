@@ -1,0 +1,128 @@
+﻿==============================================================================
+  DIAGBIG - MANUAL DE USO
+==============================================================================
+
+O QUE É
+-------
+O DiagBIG lê os logs do PC do cliente e mostra, em poucos segundos, se há
+sinais de problema em:
+  - DISCO (erros de disco/NTFS e SMART)
+  - REINÍCIOS E DESLIGAMENTOS (queda de energia, botão de energia, tela azul)
+  - BANCO MySQL/MariaDB (erros do arquivo .err)
+
+Ele SÓ LÊ. Não altera nada no Windows, nos serviços nem no banco, e não
+conecta no MySQL. Pode rodar com o sistema do cliente aberto.
+
+
+COMO USAR (PASSO A PASSO)
+-------------------------
+  1. Copie o DiagBIG.exe para o PC do cliente (qualquer pasta).
+  2. Dê dois cliques. O Windows pede permissão de administrador: clique em Sim.
+  3. A coleta começa sozinha ("Coletando, aguarde..."). Leva poucos segundos.
+  4. Leia o RESUMO, no começo do texto.
+  5. Clique em:
+       - "Copiar resumo" para colar no comentário do caso (até 3.500 caracteres);
+       - "Copiar tudo" para mandar o relatório completo ao N2.
+     Aparece "Copiado!" quando der certo.
+
+Para olhar outro período, escolha 7, 30 ou 90 dias e clique em
+"Coletar novamente". O padrão é 30 dias.
+
+
+COMO LER O RESUMO
+-----------------
+Cada linha tem um destes três estados:
+
+  OK              Verificado e nada encontrado no período.
+  ATENÇÃO         Encontrou algo. Veja a quantidade e a data da última vez.
+  NÃO VERIFICADO  Não deu para verificar. O motivo vem escrito na linha.
+                  Não quer dizer que está tudo bem.
+
+Exemplo:
+  DISCO: ATENÇÃO — 12 eventos (disk 7: 10x, Ntfs 55: 2x), último em 10/11/2026 14:32
+
+
+O QUE CADA ITEM QUER DIZER
+--------------------------
+DISCO
+  Erros de disco e do sistema de arquivos. "disk 7" = setor defeituoso;
+  "disk 51/153" = falha de leitura/escrita; "Ntfs 55" = estrutura do disco
+  corrompida. Com ATENÇÃO: suspeitar do disco e encaminhar ao N2.
+
+SMART
+  O próprio disco avisando que vai falhar. ATENÇÃO aqui é grave: backup já.
+  Em máquina virtual, RAID e alguns NVMe é normal dar NÃO VERIFICADO.
+
+DESLIGAMENTOS INESPERADOS
+  O PC desligou sem desligar o Windows. Na seção "REINÍCIOS E DESLIGAMENTOS",
+  a "Interpretação" do Kernel-Power 41 diz o provável motivo:
+    - provável QUEDA/CORTE DE ENERGIA, reset ou travamento total;
+    - BOTÃO DE ENERGIA pressionado/segurado;
+    - TELA AZUL (com o código).
+  O EventLog 6008 diz o horário em que o PC caiu.
+  Queda de energia é causa comum de banco corrompido.
+
+LIGA/DESLIGA
+  Quantas vezes o PC ligou, desligou certo, foi reiniciado por alguém e caiu,
+  e desde quando está ligado. A LINHA DO TEMPO mostra data e hora de cada
+  evento e, nos reinícios pedidos (User32 1074), qual usuário ou programa
+  pediu (ex.: Windows Update).
+  Obs.: no Windows 10/11 com Inicialização Rápida, "Desligar" aparece como
+  SUSPENSÃO / VOLTOU DA SUSPENSÃO, e não como LIGOU / DESLIGOU.
+
+BANCO (nome do serviço)
+  Erros do arquivo .err do MySQL/MariaDB: tabela "marked as crashed",
+  página corrompida, disco cheio, crash do banco etc.
+  O relatório mostra qual .err foi lido e como ele foi achado.
+
+EVENTOS DO BANCO NO WINDOWS
+  Banco que travou (Application Error 1000) ou serviço do banco que parou
+  ou não iniciou (Service Control Manager).
+
+
+ONDE FICA O RELATÓRIO
+---------------------
+Na pasta DiagBIG_relatorios, ao lado do DiagBIG.exe. Se não der para gravar
+lá, vai para Área de Trabalho\DiagBIG_relatorios.
+Nome: DiagBIG_<NOMEDOPC>_<data>_<hora>.txt
+Ficam os 10 últimos de cada PC; os mais antigos são apagados sozinhos.
+
+Botões:
+  Abrir TXT    abre o relatório no Bloco de Notas.
+  Abrir pasta  abre a pasta com o relatório selecionado.
+
+
+SITUAÇÕES COMUNS
+----------------
+"SMART: NÃO VERIFICADO" em máquina virtual
+  Normal. VM não informa SMART.
+
+"BANCO: NÃO VERIFICADO — nenhum serviço ..."
+  Não tem MySQL/MariaDB instalado como serviço neste PC, ou ele está em
+  pasta fora do padrão. Confira se é o PC certo (o servidor do banco).
+
+"lido old_NOMEDOPC.err porque NOMEDOPC.err não existe"
+  Alguém renomeou o .err. O banco continua gravando no arquivo renomeado até
+  o serviço ser reiniciado; por isso os erros continuam aparecendo.
+
+"outro .err alterado no período NÃO lido"
+  Existe um .err antigo (ex.: old_...) com erros recentes que não foi lido.
+  Se precisar, abra esse arquivo também.
+
+"AVISO: não cobre o período escolhido"
+  O log do Windows não guarda tanto tempo (foi sobrescrito ou limpo).
+  O que existe foi lido; o período antes disso não dá para saber.
+
+"AVISO: log de eventos LIMPO"
+  Alguém apagou o log de eventos no período. Vale anotar no caso.
+
+"Falha ao copiar"
+  A área de transferência estava ocupada (comum no acesso remoto).
+  Clique de novo, ou use "Abrir TXT" e copie de lá.
+
+
+PARA O SUPORTE TÉCNICO
+----------------------
+  DiagBIG.exe --sem-janela            gera só o TXT e fecha
+  DiagBIG.exe --sem-janela --dias 7   idem, com período de 7 dias
+Precisa do .NET Framework 4 (Windows 7 SP1 em diante; Windows 10/11 já têm).

@@ -1,0 +1,35 @@
+2026-10-28 07:58:01 0 [Note] InnoDB: Using Linux native AIO
+2026-10-28 07:58:01 0 [Note] InnoDB: Uses event mutexes
+2026-10-28 07:58:02 0 [Note] InnoDB: 10.4.32 started; log sequence number 104857600; transaction id 77001
+2026-10-28 07:58:02 0 [Note] Server socket created on IP: '::'.
+2026-10-28 07:58:02 0 [Note] C:\BIG_db\bin\mariadbd.exe: ready for connections.
+2026-11-03 16:40:12 8 [ERROR] mysqld: Table '.\big\movimento' is marked as crashed and should be repaired
+2026-11-03 16:40:12 8 [Warning] Checking table:   '.\big\movimento'
+2026-11-03 16:41:30 9 [ERROR] mysqld: Table '.\big\movimento' is marked as crashed and should be repaired
+2026-11-05 09:12:44 0 [ERROR] InnoDB: Database page corruption on disk or a failed file read of tablespace big/clientes page [page id: space=12, page number=3345]. You may have to recover from a backup.
+2026-11-05 09:12:44 0 [Note] InnoDB: Page dump in ascii and hex (16384 bytes):
+2026-11-05 09:12:44 0 [ERROR] InnoDB: Plugin initialization aborted with error Data structure corruption
+2026-11-05 09:12:45 0 [Note] InnoDB: You may have to recover from a backup. If you set innodb_force_recovery=1 the server may start.
+2026-11-05 09:12:45 0 [ERROR] Plugin 'InnoDB' init function returned error.
+2026-11-05 09:12:45 0 [ERROR] Aborting
+2026-11-07 11:20:03 15 [ERROR] mysqld: Disk full (C:\BIG_db\data\big\#sql-1a2c_f.MAI); waiting for someone to free some space... (errno: 28 "No space left on device")
+2026-11-07 11:20:04 15 [ERROR] InnoDB: Write to file .\big\log_vendas.ibd failed at offset 2097152, 16384 bytes should have been written, only 0 were written. Operating system error number 112.
+2026-11-07 11:21:10 0 [Note] InnoDB: Buffer pool(s) load completed at 261107 11:21:10
+2026-11-08 02:13:51 0 [ERROR] InnoDB: Assertion failure in file D:\winx64-packages\build\src\storage\innobase\btr\btr0cur.cc line 6111
+InnoDB: Failing assertion: !cursor->index->is_committed()
+InnoDB: We intentionally generate a memory trap.
+InnoDB: Submit a detailed bug report to https://jira.mariadb.org/
+InnoDB: If you get repeated assertion failures or crashes, even
+InnoDB: immediately after the mysqld startup, there may be
+InnoDB: corruption in the InnoDB tablespace. Please refer to
+InnoDB: https://mariadb.com/kb/en/library/innodb-recovery-modes/
+InnoDB: about forcing recovery.
+261108  2:13:51 [ERROR] mysqld got exception 0x80000003 ;
+Sorry, we probably made a mistake, and this is a bug.
+Server version: 10.4.32-MariaDB
+Thread pointer: 0x1d5c8a0b2f8
+mariadbd.exe!btr_cur_pessimistic_update()[btr0cur.cc:4979]
+mariadbd.exe!row_upd_clust_rec()[row0upd.cc:2783]
+2026-11-08 02:14:20 0 [Note] InnoDB: Starting crash recovery from checkpoint LSN=104857600
+2026-11-08 02:14:22 0 [Note] C:\BIG_db\bin\mariadbd.exe: ready for connections.
+2026-11-09 18:00:00 22 [Warning] Aborted connection 22 to db: 'big' user: 'root' host: 'localhost' (Got an error reading communication packets)

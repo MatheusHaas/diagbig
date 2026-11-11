@@ -1,0 +1,36 @@
+141020  8:01:12 [Note] Plugin 'FEDERATED' is disabled.
+141020  8:01:12 InnoDB: The InnoDB memory heap is disabled
+141020  8:01:13 InnoDB: Initializing buffer pool, size = 128.0M
+141020  8:01:13 [Note] Server hostname (bind-address): '0.0.0.0'; port: 3306
+141020  8:01:13 [Note] C:\BIG_db\bin\mysqld.exe: ready for connections.
+Version: '5.5.62'  socket: ''  port: 3306  MySQL Community Server (GPL)
+141021 14:22:07 [ERROR] C:\BIG_db\bin\mysqld.exe: Table '.\big\produtos' is marked as crashed and should be repaired
+141021 14:22:07 [Warning] Checking table:   '.\big\produtos'
+141021 14:25:40 [ERROR] C:\BIG_db\bin\mysqld.exe: Table '.\big\produtos' is marked as crashed and should be repaired
+141021 15:02:11 [ERROR] Got error 145 when reading table '.\big\estoque'
+141022 10:00:00 [ERROR] Incorrect key file for table '.\big\vendas.MYI'; try to repair it
+141022 10:03:15 - mysqld got exception 0xc0000005 ;
+This could be because you hit a bug. It is also possible that this binary
+or one of the libraries it was linked against is corrupt, improperly built,
+or misconfigured. This error can also be caused by malfunctioning hardware.
+We will try our best to scrape up some info that will hopefully help diagnose
+the problem, but since we have already crashed, something is definitely wrong
+and this may fail.
+
+key_buffer_size=8388608
+read_buffer_size=65536
+max_used_connections=12
+max_threads=151
+thread_count=10
+Thread pointer: 0x0
+Attempting backtrace. You can use the following information to find out
+where mysqld died. If you see no messages after this, something went
+terribly wrong...
+000000013F6E2C3B    mysqld.exe!my_mb_wc_utf8()
+000000013F8A1D20    mysqld.exe!ha_myisam::index_next()
+141022 10:03:20 [Note] Plugin 'FEDERATED' is disabled.
+141022 10:03:21 InnoDB: Database was not shut down normally!
+InnoDB: Starting crash recovery.
+InnoDB: Reading tablespace information from the .ibd files...
+141022 10:03:25  InnoDB: Waiting for the background threads to start
+141022 10:03:26 [Note] C:\BIG_db\bin\mysqld.exe: ready for connections.

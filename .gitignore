@@ -1,0 +1,6 @@
+bin/
+obj/
+*.user
+TestResults/
+# especificação original fica só local
+ESPECIFICACAO_*.md

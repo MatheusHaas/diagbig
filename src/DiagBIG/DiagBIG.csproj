@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- net40: roda em qualquer .NET Framework 4.x (Win7 SP1 com 4.0+ até Win11, que já traz 4.8). -->
+    <TargetFramework>net40</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>DiagBIG</AssemblyName>
+    <RootNamespace>DiagBIG</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Gerado a partir de linx.jpeg (raiz do repositório) com Pillow, tamanhos 16 a 256. -->
+    <ApplicationIcon>Resources\diagbig.ico</ApplicationIcon>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Version>1.3.1</Version>
+    <Product>DiagBIG</Product>
+    <Description>Coletor de logs de disco e banco para o suporte</Description>
+    <!-- Sem DiagBIG.exe.config: um único .exe (o runtime v4 já é o padrão do assembly). -->
+    <GenerateSupportedRuntime>false</GenerateSupportedRuntime>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Logo embutido no próprio .exe (recurso simples, sem .resx). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\linx.jpeg" LogicalName="DiagBIG.logo.jpeg" />
+    <!-- Manual mostrado pelo botão Ajuda (mesmo texto do MANUAL-DiagBIG.txt da entrega). -->
+    <EmbeddedResource Include="..\..\docs\MANUAL.txt" LogicalName="DiagBIG.manual.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.ServiceProcess" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+</Project>

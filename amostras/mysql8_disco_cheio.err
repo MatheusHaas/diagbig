@@ -1,0 +1,21 @@
+2026-11-01T10:00:00.123456Z 0 [System] [MY-010116] [Server] C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe (mysqld 8.0.36) starting as process 4120
+2026-11-01T10:00:01.000000Z 1 [System] [MY-013576] [InnoDB] InnoDB initialization has started.
+2026-11-01T10:00:03.500000Z 0 [System] [MY-010931] [Server] C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe: ready for connections. Version: '8.0.36'  socket: ''  port: 3306  MySQL Community Server - GPL.
+2026-11-04T13:45:10.000001Z 33 [ERROR] [MY-012592] [InnoDB] Operating system error number 112 in a file operation.
+2026-11-04T13:45:10.000002Z 33 [ERROR] [MY-012596] [InnoDB] Error number 112 means 'There is not enough space on the disk.'
+2026-11-04T13:45:10.000003Z 33 [ERROR] [MY-012639] [InnoDB] Write to file .\big\nfe_itens.ibd failed at offset 805306368, 1048576 bytes should have been written, only 0 were written. Operating system error number 112. Check that your OS and file system support files of this size. Check also that the disk is not full or a disk quota exceeded.
+2026-11-04T13:45:11.000000Z 33 [ERROR] [MY-012144] [InnoDB] posix_fallocate(): Failed to preallocate data for file .\big\nfe_itens.ibd, desired size 1048576 bytes. Operating system error number 28. Check that the disk is not full or a disk quota exceeded. Make sure the file system supports this function. Refer to your operating system documentation for operating system error code information. (No space left on device)
+2026-11-06T22:10:00.000000Z 0 [Warning] [MY-010068] [Server] CA certificate ca.pem is self signed.
+2026-11-09T03:30:15.654321Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: fil0fil.cc:9871:err == DB_SUCCESS thread 5432
+InnoDB: We intentionally generate a memory trap.
+InnoDB: Submit a detailed bug report to http://bugs.mysql.com.
+2026-11-09T03:30:15Z UTC - mysqld got exception 0x80000003 ;
+Most likely, you have hit a bug, but this error can also be caused by malfunctioning hardware.
+Thread pointer: 0x2a1b4c0e3f0
+Attempting backtrace. You can use the following information to find out
+where mysqld died. If you see no messages after this, something went
+terribly wrong...
+7ff6a1b2c3d4    mysqld.exe!?fil_io@@YA?AUdberr_t@@AEBVIORequest@@_NAEBUpage_id_t@@AEBUpage_size_t@@KKPEAX3@Z()
+2026-11-09T03:31:02.000000Z 0 [System] [MY-010116] [Server] C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe (mysqld 8.0.36) starting as process 6612
+2026-11-09T03:31:05.000000Z 1 [Note] [MY-012551] [InnoDB] Database was not shutdown normally! Starting crash recovery.
+2026-11-09T03:31:09.000000Z 0 [System] [MY-010931] [Server] C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqld.exe: ready for connections.
