@@ -47,7 +47,17 @@ O QUE CADA ITEM QUER DIZER
 DISCO
   Erros de disco e do sistema de arquivos. "disk 7" = setor defeituoso;
   "disk 51/153" = falha de leitura/escrita; "Ntfs 55" = estrutura do disco
-  corrompida. Com ATENÇÃO: suspeitar do disco e encaminhar ao N2.
+  corrompida; "129" = disco/controladora travou e foi reiniciado.
+  Também lê os erros das controladoras RAID de servidor (Dell PERC,
+  HP Smart Array, LSI, Adaptec). Com ATENÇÃO: suspeitar do disco e
+  encaminhar ao N2.
+
+RAID (no cabeçalho, em IDENTIFICAÇÃO)
+  SIM = o PC/servidor tem controladora RAID (mostra qual).
+  NÃO = discos ligados direto (mostra as controladoras vistas).
+  Com RAID, o Windows não vê o SMART dos discos físicos: confira os discos
+  na ferramenta da controladora (Dell OpenManage/iDRAC, HPE SSA/iLO,
+  MegaRAID Storage Manager).
 
 SMART
   O próprio disco avisando que vai falhar. ATENÇÃO aqui é grave: backup já.
@@ -95,8 +105,9 @@ Botões:
 
 SITUAÇÕES COMUNS
 ----------------
-"SMART: NÃO VERIFICADO" em máquina virtual
-  Normal. VM não informa SMART.
+"SMART: NÃO VERIFICADO" em máquina virtual ou servidor com RAID
+  Normal. VM e controladora RAID não repassam o SMART ao Windows.
+  Com RAID, veja os discos na ferramenta da controladora.
 
 "BANCO: NÃO VERIFICADO — nenhum serviço ..."
   Não tem MySQL/MariaDB instalado como serviço neste PC, ou ele está em
@@ -127,3 +138,7 @@ PARA O SUPORTE TÉCNICO
   DiagBIG.exe --sem-janela            gera só o TXT e fecha
   DiagBIG.exe --sem-janela --dias 7   idem, com período de 7 dias
 Precisa do .NET Framework 4 (Windows 7 SP1 em diante; Windows 10/11 já têm).
+Windows Server: 2012 em diante funciona direto; 2008/2008 R2 precisam do
+.NET 4 instalado; no 2003 o log de eventos não pode ser lido (só o .err).
+No Windows Server, todo reinício aparece na linha do tempo com o motivo
+informado por quem reiniciou (User32 1074).

@@ -72,7 +72,26 @@ namespace DiagBIG.Windows
         }
 
         /// <summary>Status SMART via WMI (root\wmi). Nunca lança exceção.</summary>
-        public static ReportBlock Smart(out SummaryItem summary)
+        /// <summary>Controladoras (Win32_SCSIController) e modelos de disco (Win32_DiskDrive) → tem RAID?</summary>
+        public static RaidInfo DetectRaid()
+        {
+            var ctrls = new List<StorageController>();
+            using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Name, DriverName FROM Win32_SCSIController", Options()))
+                foreach (ManagementObject mo in s.Get())
+                    using (mo)
+                        ctrls.Add(new StorageController
+                        {
+                            Name = Convert.ToString(mo["Name"], CultureInfo.InvariantCulture),
+                            DriverName = Convert.ToString(mo["DriverName"], CultureInfo.InvariantCulture),
+                        });
+            var models = new List<string>();
+            using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Model FROM Win32_DiskDrive", Options()))
+                foreach (ManagementObject mo in s.Get())
+                    using (mo) models.Add(Convert.ToString(mo["Model"], CultureInfo.InvariantCulture));
+            return Storage.DetectRaid(ctrls, models);
+        }
+
+        public static ReportBlock Smart(RaidInfo raid, out SummaryItem summary)
         {
             var block = new ReportBlock { Title = "SMART (PREVISÃO DE FALHA DO DISCO)", InfoOnly = true };
             summary = new SummaryItem { Label = "SMART" };
@@ -110,15 +129,15 @@ namespace DiagBIG.Windows
             }
             catch (ManagementException ex) when (ex.ErrorCode == ManagementStatus.NotSupported || ex.ErrorCode == ManagementStatus.InvalidClass)
             {
-                return SmartNotVerified(block, summary, "SMART não suportado neste PC (comum em VM, RAID e alguns NVMe)");
+                return SmartNotVerified(block, summary, "SMART não suportado neste PC (comum em VM, RAID e alguns NVMe)", raid);
             }
             catch (Exception ex)
             {
-                return SmartNotVerified(block, summary, "falha ao consultar SMART via WMI: " + ex.Message);
+                return SmartNotVerified(block, summary, "falha ao consultar SMART via WMI: " + ex.Message, raid);
             }
 
             if (count == 0)
-                return SmartNotVerified(block, summary, "nenhum disco informou SMART (comum em VM, RAID e alguns NVMe)");
+                return SmartNotVerified(block, summary, "nenhum disco informou SMART (comum em VM, RAID e alguns NVMe)", raid);
 
             if (failing > 0)
             {
@@ -134,11 +153,17 @@ namespace DiagBIG.Windows
             return block;
         }
 
-        static ReportBlock SmartNotVerified(ReportBlock block, SummaryItem summary, string reason)
+        static ReportBlock SmartNotVerified(ReportBlock block, SummaryItem summary, string reason, RaidInfo raid)
         {
             summary.Status = CheckStatus.NaoVerificado;
             summary.Text = reason;
             block.Info.Add("Resultado: NÃO VERIFICADO — " + reason);
+            if (raid != null && raid.Found)
+            {
+                summary.Text += "; há RAID: verificar os discos pela ferramenta da controladora";
+                block.Info.Add("Há controladora RAID: o Windows não enxerga o SMART dos discos físicos atrás dela.");
+                block.Info.Add("Verificar pela ferramenta da controladora (ex.: Dell OpenManage/iDRAC, HPE SSA/iLO, MegaRAID Storage Manager).");
+            }
             return block;
         }
 

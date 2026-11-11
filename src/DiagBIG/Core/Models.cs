@@ -79,6 +79,9 @@ namespace DiagBIG.Core
         public string OutputFileName { get; set; }
         /// <summary>Último boot completo do Windows (null = não lido).</summary>
         public DateTime? LastBoot { get; set; }
+        /// <summary>Controladora RAID encontrada? (null + RaidError = não verificado)</summary>
+        public RaidInfo Raid { get; set; }
+        public string RaidError { get; set; }
         public List<string> Drives { get; } = new List<string>();
         public string DrivesError { get; set; }
         public List<LogCoverage> LogCoverages { get; } = new List<LogCoverage>();

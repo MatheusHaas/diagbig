@@ -80,6 +80,7 @@ namespace DiagBIG.Tests
             d.LogClearedEvents.Add(Ev("Microsoft-Windows-Eventlog", 104, new DateTime(2026, 11, 2, 8, 0, 0), "O log Sistema foi limpo."));
             d.ErrCoverages.Add(new ErrCoverage { Label = "BANCO (MariaDB)", FirstDate = new DateTime(2026, 11, 5), Truncated = true, FileSize = 300L * 1024 * 1024, BytesRead = 10L * 1024 * 1024 });
 
+            d.Raid = Storage.DetectRaid(null, null);
             var occ = Enumerable.Range(0, 40).Select(i => Ev("disk", 7, new DateTime(2026, 11, 1).AddHours(i), "msg " + i)).ToArray();
             var disk = Block(occ);
             var empty = new ReportBlock { Title = "Desligamentos" };
@@ -96,6 +97,7 @@ namespace DiagBIG.Tests
             string txt = ReportBuilder.BuildFull(d);
 
             Assert.Contains("  PC ............: CAIXA01", txt);
+            Assert.Contains("  RAID ..........: NÃO — nenhuma controladora SCSI/RAID listada", txt);
             Assert.Contains("IDENTIFICAÇÃO\r\n-------------", txt);
             Assert.Contains("COBERTURA DOS LOGS", txt);
             Assert.Contains("PERÍODO .......: últimos 30 dias (desde 12/10/2026 09:30)", txt);

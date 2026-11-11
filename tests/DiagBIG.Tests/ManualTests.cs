@@ -17,6 +17,8 @@ namespace DiagBIG.Tests
         [InlineData("LIGA/DESLIGA")]
         [InlineData("BANCO")]
         [InlineData("EVENTOS DO BANCO NO WINDOWS")]
+        [InlineData("RAID")]
+        [InlineData("Windows Server")]
         [InlineData("DiagBIG_relatorios")]
         [InlineData("--sem-janela")]
         public void ManualMentions(string term)

@@ -109,6 +109,17 @@ Antes de começar
      O mesmo texto está em MANUAL-DiagBIG.txt, nesta pasta.
 
 
+8) Windows Server (VM com Windows Server 2019 ou 2022 de avaliação, gratuita por 180 dias)
+   - Copie e rode o DiagBIG.exe como nos passos anteriores (2012 em diante não precisa instalar nada).
+   - Esperado na IDENTIFICAÇÃO: "RAID ..........: NÃO — controladoras: ..." (VM não tem RAID).
+     Em VMware a controladora "LSI Adapter, SAS ..." (driver lsi_sas) NÃO pode aparecer como RAID.
+   - SMART: NÃO VERIFICADO (VM).
+   - Reinicie pelo menu Iniciar: o Windows Server pede um motivo e um comentário. Escreva "teste DiagBIG".
+     Coletar: a LINHA DO TEMPO mostra DESLIGAR/REINICIAR SOLICITADO (User32 1074) com o usuário,
+     o motivo e o comentário "teste DiagBIG", e depois DESLIGOU CORRETAMENTE / LIGOU.
+   - Num servidor real com RAID (Dell PERC, HP Smart Array): RAID: SIM — controladora ... (driver ...),
+     e o SMART explica que os discos devem ser vistos na ferramenta da controladora.
+
 Amostras (pasta amostras\)
 - mysql4_tabela_crashed.err  MySQL 4 (mysql.err, sem [ERROR]): tabela crashed, Got error 127, crash recovery.
 - mysql51_crash.err ........ MySQL 5.1: tabela crashed, Got error 145, chave incorreta, crash com stack.

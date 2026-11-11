@@ -28,10 +28,17 @@ O relatório vai para `DiagBIG_relatorios\DiagBIG_<PC>_<aaaaMMdd_HHmmss>.txt`, a
 
 **Requisito:** .NET Framework 4.x, presente do Windows 7 SP1 (com .NET 4 instalado) ao Windows 11, que já traz o 4.8.
 
+| Windows Server | Situação |
+|---|---|
+| 2012 / 2012 R2 / 2016 / 2019 / 2022 / 2025 | Funciona direto (já tem .NET 4.5+) |
+| 2008 / 2008 R2 SP1 | Funciona com .NET 4.x instalado |
+| 2003 / 2003 R2 | Não recomendado: a API do log de eventos (Vista+) não existe; só o `.err` e o SMART funcionam |
+| Server Core | Sem janela; usar `--sem-janela` (não testado) |
+
 ### Compilar (Ubuntu ou qualquer SO com .NET SDK 8)
 
 ```bash
-dotnet test                                          # 80 testes da lógica (net8.0)
+dotnet test                                          # 97 testes da lógica (net8.0)
 dotnet build src/DiagBIG/DiagBIG.csproj -c Release   # gera src/DiagBIG/bin/Release/net40/DiagBIG.exe
 ```
 
@@ -70,9 +77,10 @@ Cada parte roda isolada: se uma falhar (sem permissão, log inexistente, WMI que
 Equivale a "Filtrar log atual" no Visualizador de Eventos, só que automático.
 
 - `EventLogReader` com **XPath filtrando nível e período na própria consulta**, sem ler o log inteiro.
-- **Crítico + Erro** de qualquer fonte cujo nome **contenha** `disk`, `ntfs`, `volmgr`, `atapi`, `storahci`, `stornvme` ou `iastor`. O XPath do log de eventos não tem `contains()`, então a fonte é filtrada no código.
-- **Avisos** da fonte `disk` com IDs **51, 52 e 153**, sinais clássicos de disco falhando.
-- **SMART** via WMI (`root\wmi`, `MSStorageDriver_FailurePredictStatus`): `PredictFailure = True` → ATENÇÃO. Em VM, RAID e alguns NVMe não há suporte → `NÃO VERIFICADO`, sem quebrar. Também lista modelo e status dos discos (`Win32_DiskDrive`).
+- **Crítico + Erro** de qualquer fonte cujo nome **contenha** `disk`, `ntfs`, `volmgr`, `atapi`, `storahci`, `stornvme` ou `iastor`, ou os drivers de **controladora RAID de servidor**: `megasas`/`percsas` (Dell PERC, LSI MegaRAID), `hpcisss`/`hpsamd` (HP Smart Array), `smartpqi` (HPE/Microsemi), `lsi_sas`, `arcsas` (Adaptec) e `arcmsr` (Areca). O XPath do log de eventos não tem `contains()`, então a fonte é filtrada no código.
+- **Avisos** da fonte `disk` com IDs **51, 52 e 153**, e o aviso **129 ("Reset to device")** de qualquer uma dessas fontes, que é o sinal clássico de disco travando atrás de uma controladora.
+- **RAID explícito no cabeçalho** (`RAID: SIM / NÃO / NÃO VERIFICADO`), a partir de `Win32_SCSIController` (nome e driver) e dos modelos em `Win32_DiskDrive` (ex.: `DELL PERC H730 ... Disk Device`, `HP LOGICAL VOLUME`). Os drivers `lsi_sas`, `arcsas` e `iaStor` também servem a controladoras sem RAID (VMware, Intel RST em AHCI), então só contam se o nome da controladora disser RAID.
+- **SMART** via WMI (`root\wmi`, `MSStorageDriver_FailurePredictStatus`): `PredictFailure = True` → ATENÇÃO. Em VM, RAID e alguns NVMe não há suporte → `NÃO VERIFICADO`, sem quebrar; com RAID, o texto aponta a ferramenta da controladora (OpenManage/iDRAC, HPE SSA/iLO, MegaRAID Storage Manager). Também lista modelo e status dos discos (`Win32_DiskDrive`).
 
 ### 2. Reinícios e desligamentos
 
@@ -218,7 +226,7 @@ Grava em `DiagBIG_relatorios\` (ao lado do .exe ou na Área de Trabalho) e mant�
 ```text
 src/DiagBIG/
   Core/        lógica pura (testada): Config, ImagePathParser, MyIniParser, DbPathResolver,
-               ErrTailReader, ErrLogAnalyzer, PowerEvents, Grouping, ReportBuilder, WinPath
+               ErrTailReader, ErrLogAnalyzer, PowerEvents, Storage, Grouping, ReportBuilder, WinPath
   Windows/     Collector (orquestra), EventLogs, DbDiscovery, SystemInfo (SMART, boot, unidades)
   UI/          MainForm, HelpForm
   Resources/   diagbig.ico
@@ -231,7 +239,7 @@ TESTE-NA-VM.txt        roteiro de teste manual no Windows
 
 ## Testes
 
-- **80 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath (inclusive executáveis do MySQL 4 e `mysqld` sem `.exe` do 5.1), my.ini (WinMySQLadmin do MySQL 4, instalador do 5.1, ordem de leitura), regras do `.err` (inclusive `mysql.err`), datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, retenção de relatórios e o manual citando todos os itens do RESUMO.
+- **97 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath (inclusive executáveis do MySQL 4 e `mysqld` sem `.exe` do 5.1), my.ini (WinMySQLadmin do MySQL 4, instalador do 5.1, ordem de leitura), regras do `.err` (inclusive `mysql.err`), datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, regra de eventos de disco e detecção de RAID (incluindo os falsos positivos de VM e de Intel RST), retenção de relatórios e o manual citando todos os itens do RESUMO.
 - As **amostras** em `amostras/` são usadas diretamente pelos testes.
 - O que depende do Windows (EventLog, WMI, registro, janela) é testado à mão com o roteiro [`TESTE-NA-VM.txt`](TESTE-NA-VM.txt): disco com `Write-EventLog`, `.err` com linhas injetadas, `.err` renomeado/ausente, reinício normal e desligamento forçado da VM, modo sem janela e botões.
 

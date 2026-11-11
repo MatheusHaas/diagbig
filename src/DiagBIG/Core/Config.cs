@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.4.0";
+        public const string Version = "1.5.0";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -15,11 +15,28 @@ namespace DiagBIG.Core
         // ---------------- Parte 1: disco / NTFS (log Sistema) ----------------
 
         /// <summary>Provider entra se o nome CONTIVER algum destes (sem diferenciar maiúsculas). Níveis Crítico e Erro.</summary>
-        public static readonly string[] DiskSources = { "disk", "ntfs", "volmgr", "atapi", "storahci", "stornvme", "iastor" };
+        /// Inclui drivers de controladora RAID de servidor: Dell PERC/LSI MegaRAID (megasas, percsas),
+        /// HP Smart Array (HpCISSs, hpsamd), Microsemi/HPE (smartpqi), LSI SAS (lsi_sas), Adaptec (arcsas), Areca (arcmsr).
+        public static readonly string[] DiskSources =
+        {
+            "disk", "ntfs", "volmgr", "atapi", "storahci", "stornvme", "iastor",
+            "megasas", "percsas", "hpcisss", "hpsamd", "smartpqi", "lsi_sas", "arcsas", "arcmsr",
+        };
 
         /// <summary>Avisos (nível 3) da fonte "disk" que indicam disco falhando.</summary>
         public const string DiskWarningSource = "disk";
         public static readonly int[] DiskWarningIds = { 51, 52, 153 };
+        /// <summary>Avisos de qualquer fonte de disco/controladora: 129 = "Reset to device" (disco travando/timeout).</summary>
+        public static readonly int[] StorageWarningIds = { 129 };
+
+        // ---------------- Detecção de RAID (só informativa) ----------------
+        /// <summary>Driver de controladora que é sempre RAID.</summary>
+        public static readonly string[] RaidDrivers = { "megasas", "percsas", "hpcisss", "hpsamd", "smartpqi", "arcmsr" };
+        /// <summary>Driver que também serve a controladoras sem RAID: só conta se o nome tiver RaidNameKeywords.</summary>
+        public static readonly string[] RaidDriversIfNamed = { "lsi_sas", "arcsas", "iastor" };
+        public static readonly string[] RaidNameKeywords = { "RAID", "PERC", "Smart Array", "MegaRAID" };
+        /// <summary>Modelo do disco (Win32_DiskDrive) que indica volume lógico de RAID.</summary>
+        public static readonly string[] RaidDiskModelKeywords = { "PERC", "LOGICAL VOLUME", "MegaRAID", "RAID", "Smart Array" };
 
         // ---------------- Desligamentos inesperados (log Sistema) ----------------
         public const string KernelPowerProvider = "Microsoft-Windows-Kernel-Power";

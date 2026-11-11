@@ -133,6 +133,8 @@ namespace DiagBIG.Core
             sb.Append("  WINDOWS .......: ").Append(d.WindowsVersion).Append(NL);
             sb.Append("  COLETA ........: ").Append(DateTimeLong(d.CollectedAt)).Append(NL);
             sb.Append("  PERÍODO .......: últimos ").Append(d.PeriodDays).Append(" dias (desde ").Append(DateTimeShort(d.Since)).Append(')').Append(NL);
+            if (d.Raid != null || d.RaidError != null)
+                sb.Append("  RAID ..........: ").Append(Storage.RaidLine(d.Raid, d.RaidError)).Append(NL);
             if (d.LastBoot != null)
                 sb.Append("  LIGADO DESDE ..: ").Append(DateTimeShort(d.LastBoot)).Append(" (último boot completo)").Append(NL);
             if (!string.IsNullOrEmpty(d.OutputFileName))

@@ -64,25 +64,23 @@ namespace DiagBIG.Windows
             var diskSection = new ReportSection { Title = "DISCO / NTFS" };
             ReportBlock disk = RunEvents("EVENTOS DE DISCO/NTFS", () =>
             {
-                string xpath = "*[System[((Level=1 or Level=2) or (Level=3 and " + EventLogs.IdsFilter(Config.DiskWarningIds) + ")) and " + time + "]]";
+                string xpath = "*[System[((Level=1 or Level=2) or (Level=3 and " +
+                               EventLogs.IdsFilter(Config.DiskWarningIds.Concat(Config.StorageWarningIds)) + ")) and " + time + "]]";
                 bool capped;
-                var list = EventLogs.Query("System", xpath, rec =>
-                {
-                    string p = rec.ProviderName ?? "";
-                    if (rec.Level == 3)
-                        return string.Equals(p, Config.DiskWarningSource, StringComparison.OrdinalIgnoreCase) && Config.DiskWarningIds.Contains(rec.Id);
-                    return EventLogs.ContainsAny(p, Config.DiskSources);
-                }, out capped);
+                var list = EventLogs.Query("System", xpath, rec => Storage.IsDiskEvent(rec.ProviderName, rec.Level ?? 0, rec.Id), out capped);
                 return Tuple(list, capped);
             });
             disk.Info.Insert(0, "Log Sistema: Crítico/Erro de " + string.Join(", ", Config.DiskSources) +
-                                "; avisos disk " + string.Join("/", Config.DiskWarningIds.Select(i => i.ToString()).ToArray()) + ".");
+                                "; avisos disk " + string.Join("/", Config.DiskWarningIds.Select(i => i.ToString()).ToArray()) +
+                                "; aviso 129 (reset do dispositivo) dessas fontes.");
             diskSection.Blocks.Add(disk);
             d.Summary.Add(ReportBuilder.Summarize("DISCO", new[] { disk }));
 
-            progress("Verificando SMART...");
+            progress("Verificando RAID e SMART...");
+            try { d.Raid = SystemInfo.DetectRaid(); }
+            catch (Exception ex) { d.RaidError = "falha ao consultar controladoras via WMI: " + ex.Message; }
             SummaryItem smartSummary;
-            diskSection.Blocks.Add(SystemInfo.Smart(out smartSummary));
+            diskSection.Blocks.Add(SystemInfo.Smart(d.Raid, out smartSummary));
             d.Summary.Add(smartSummary);
             d.Sections.Add(diskSection);
 
