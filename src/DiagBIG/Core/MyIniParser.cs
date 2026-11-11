@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace DiagBIG.Core
@@ -51,6 +52,20 @@ namespace DiagBIG.Core
                 }
             }
             return opt;
+        }
+
+        /// <summary>Junta vários arquivos na ordem de leitura do MySQL: o que vem depois prevalece.</summary>
+        public static MyIniOptions Merge(IEnumerable<MyIniOptions> inOrder)
+        {
+            var r = new MyIniOptions();
+            foreach (MyIniOptions o in inOrder)
+            {
+                if (o == null) continue;
+                if (!string.IsNullOrEmpty(o.BaseDir)) r.BaseDir = o.BaseDir;
+                if (!string.IsNullOrEmpty(o.DataDir)) r.DataDir = o.DataDir;
+                if (o.LogErrorDefined) { r.LogErrorDefined = true; r.LogError = o.LogError; }
+            }
+            return r;
         }
 
         static string StripComment(string s)

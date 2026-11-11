@@ -43,9 +43,9 @@ namespace DiagBIG.Tests
     public class ErrAnalyzerTests
     {
         [Fact]
-        public void Mysql55Sample_CrashWithContext_UndatedInheritsDate()
+        public void Mysql51Sample_CrashWithContext_UndatedInheritsDate()
         {
-            var a = ErrLogAnalyzer.Analyze(Samples.Text("mysql55_crash.err"), new DateTime(2014, 10, 21));
+            var a = ErrLogAnalyzer.Analyze(Samples.Text("mysql51_crash.err"), new DateTime(2014, 10, 21));
             Assert.Equal(new DateTime(2014, 10, 20, 8, 1, 12), a.FirstDate);
 
             var crashed = a.Occurrences.Where(o => o.SummaryKey == "marked as crashed").ToList();
@@ -68,12 +68,25 @@ namespace DiagBIG.Tests
         }
 
         [Fact]
+        public void Mysql4Sample_NoErrorTags()
+        {
+            var a = ErrLogAnalyzer.Analyze(Samples.Text("mysql4_tabela_crashed.err"), new DateTime(2005, 4, 1));
+            Assert.Equal(new DateTime(2005, 3, 10, 14, 1, 23), a.FirstDate);
+            Assert.Equal(new[] { "marked as crashed", "Got error 1", "Incorrect key file", "crash recovery" },
+                         a.Occurrences.Select(o => o.SummaryKey).ToArray());
+            Assert.Equal(new DateTime(2005, 4, 12, 9, 15, 2), a.Occurrences[0].Time);
+            // "InnoDB: Starting crash recovery." sem data herda 050418 8:00:12.
+            Assert.Equal(new DateTime(2005, 4, 18, 8, 0, 12), a.Occurrences[3].Time);
+            Assert.Empty(ErrLogAnalyzer.Analyze(Samples.Text("mysql4_tabela_crashed.err"), new DateTime(2005, 5, 1)).Occurrences);
+        }
+
+        [Fact]
         public void PeriodIsRespected()
         {
-            var a = ErrLogAnalyzer.Analyze(Samples.Text("mysql55_crash.err"), new DateTime(2014, 10, 22));
+            var a = ErrLogAnalyzer.Analyze(Samples.Text("mysql51_crash.err"), new DateTime(2014, 10, 22));
             Assert.DoesNotContain(a.Occurrences, o => o.SummaryKey == "marked as crashed");
             Assert.All(a.Occurrences, o => Assert.True(o.Time >= new DateTime(2014, 10, 22)));
-            Assert.Empty(ErrLogAnalyzer.Analyze(Samples.Text("mysql55_crash.err"), new DateTime(2015, 1, 1)).Occurrences);
+            Assert.Empty(ErrLogAnalyzer.Analyze(Samples.Text("mysql51_crash.err"), new DateTime(2015, 1, 1)).Occurrences);
         }
 
         [Fact]

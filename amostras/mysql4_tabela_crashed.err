@@ -1,0 +1,19 @@
+InnoDB: The first specified data file .\ibdata1 did not exist:
+InnoDB: a new database to be created!
+050310 14:01:23  InnoDB: Setting file .\ibdata1 size to 10 MB
+050310 14:01:25  InnoDB: Started; log sequence number 0 0
+C:\mysql\bin\mysqld-nt: ready for connections.
+Version: '4.0.27-nt'  socket: ''  port: 3306  Official MySQL binary
+050412  9:15:02  C:\mysql\bin\mysqld-nt: Table '.\loja\produtos' is marked as crashed and should be repaired
+050412  9:15:40  C:\mysql\bin\mysqld-nt: Got error 127 when reading table '.\loja\estoque'
+050412 10:02:11  C:\mysql\bin\mysqld-nt: Incorrect key file for table: 'vendas'. Try to repair it
+050415 18:30:00  C:\mysql\bin\mysqld-nt: Normal shutdown
+
+050415 18:30:02  InnoDB: Starting shutdown...
+050415 18:30:04  InnoDB: Shutdown completed; log sequence number 0 43892
+050415 18:30:04  C:\mysql\bin\mysqld-nt: Shutdown Complete
+
+050418  8:00:12  InnoDB: Database was not shut down normally!
+InnoDB: Starting crash recovery.
+050418  8:00:15  InnoDB: Started; log sequence number 0 43892
+C:\mysql\bin\mysqld-nt: ready for connections.

@@ -31,7 +31,7 @@ O relatório vai para `DiagBIG_relatorios\DiagBIG_<PC>_<aaaaMMdd_HHmmss>.txt`, a
 ### Compilar (Ubuntu ou qualquer SO com .NET SDK 8)
 
 ```bash
-dotnet test                                          # 73 testes da lógica (net8.0)
+dotnet test                                          # 80 testes da lógica (net8.0)
 dotnet build src/DiagBIG/DiagBIG.csproj -c Release   # gera src/DiagBIG/bin/Release/net40/DiagBIG.exe
 ```
 
@@ -92,21 +92,21 @@ Uma consulta ao log Sistema alimenta dois blocos.
 
 ### 3. Banco: achar o serviço e o `.err`
 
-O nome do serviço não importa (`MariaDB`, `MySQL`, `MySQL80` ou qualquer outro).
+Funciona com **MariaDB**, **MySQL 5.x/8** (ex.: MySQL 5.1 em Arquivos de Programas) e **MySQL 4** (ex.: `C:\mysql`). O nome do serviço não importa.
 
-1. Varre `HKLM\SYSTEM\CurrentControlSet\Services` e pega todo serviço cujo **executável do `ImagePath`** seja `mysqld.exe`, `mariadbd.exe` ou `mysqld-nt.exe`. Pode haver mais de um.
+1. Varre `HKLM\SYSTEM\CurrentControlSet\Services` e pega todo serviço cujo **executável do `ImagePath`** seja `mysqld.exe`, `mariadbd.exe` ou os do MySQL 4 (`mysqld-nt.exe`, `mysqld-max-nt.exe`, `mysqld-max.exe`, `mysqld-opt.exe`), com ou sem `.exe`. Pode haver mais de um.
 2. Para cada serviço mostra nome, status (rodando/parado), tipo de inicialização e ImagePath.
 3. Descobre o `.err`:
 
 | Situação | Regra |
 |---|---|
-| `--defaults-file` no ImagePath (com ou sem aspas, `/` ou `\`) | Lê esse arquivo |
-| Sem `--defaults-file` | Procura `my.ini` / `my.cnf` na pasta base (pai da `bin`) e na `data` |
+| `--defaults-file` no ImagePath (com ou sem aspas, `/` ou `\`) | Lê **só** esse arquivo, como o MySQL |
+| Sem `--defaults-file` | Lê **todos** que existirem, na ordem do MySQL no Windows, e o último prevalece: `%WINDIR%\my.ini`/`my.cnf` (comum no MySQL 4), `C:\my.ini`/`my.cnf`, pasta base (pai da `bin`) e `data` |
 | Seções lidas | `[mysqld]`, `[mariadb]`, `[mariadbd]`, `[server]` e variações com versão (`[mysqld-5.5]`, `[mariadb-10.4]`) |
 | Chaves | `datadir`, `basedir`, `log-error` / `log_error` (aceita `-` e `_`, prefixo `loose-`, aspas, `\\`) |
 | `log-error` relativo | Relativo à `datadir` |
 | `log-error` sem extensão | Acrescenta `.err` |
-| `log-error` não definido | `datadir\NOMEDOPC.err` |
+| `log-error` não definido | `datadir\NOMEDOPC.err`; se não existir, `datadir\mysql.err` (padrão do MySQL 4) |
 | Arquivo esperado não existe | Usa o `.err` **modificado mais recentemente** da datadir **e avisa qual leu** |
 
 4. **Varredura de reserva**, sem busca recursiva, quando não há serviço ou o `.err` do serviço não foi achado. Em todas as unidades fixas procura `Program Files[ (x86)]\MariaDB*\data`, `Program Files\MySQL\MySQL Server*\data`, `ProgramData\MySQL\MySQL Server*\data` e **qualquer pasta na raiz da unidade** cuja `data` tenha a subpasta de sistema `mysql` (presente em toda datadir MySQL/MariaDB), seja qual for o nome da pasta.
@@ -123,7 +123,7 @@ O nome do serviço não importa (`MariaDB`, `MySQL`, `MySQL80` ou qualquer outro
 
 | Versão | Formato | Observação |
 |---|---|---|
-| MySQL 5.5 | `141022 10:00:00` / `141022  9:05:03` | Hora com 1 dígito |
+| MySQL 4 / 5.1 / 5.5 | `141022 10:00:00` / `141022  9:05:03` | Hora com 1 dígito; no MySQL 4 as linhas não têm `[ERROR]`, e os padrões pegam pelo texto |
 | MariaDB | `2024-01-01 10:00:00` | Hora local |
 | MySQL 8 | `2024-01-01T10:00:00.123456Z` | **UTC → convertido para hora local**; aceita também `-03:00` |
 
@@ -224,14 +224,14 @@ src/DiagBIG/
   Resources/   diagbig.ico
   app.manifest
 tests/DiagBIG.Tests/   xUnit em net8.0 compilando os mesmos arquivos de Core/
-amostras/              .err falsos (MySQL 5.5, MariaDB 10.4, MySQL 8) e my.ini de exemplo
+amostras/              .err falsos (MySQL 4, MySQL 5.1, MariaDB 10.4, MySQL 8) e my.ini de exemplo
 docs/MANUAL.txt        manual do N1 (botão Ajuda)
 TESTE-NA-VM.txt        roteiro de teste manual no Windows
 ```
 
 ## Testes
 
-- **73 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath, my.ini, regras do `.err`, datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, retenção de relatórios e o manual citando todos os itens do RESUMO.
+- **80 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath (inclusive executáveis do MySQL 4 e `mysqld` sem `.exe` do 5.1), my.ini (WinMySQLadmin do MySQL 4, instalador do 5.1, ordem de leitura), regras do `.err` (inclusive `mysql.err`), datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, retenção de relatórios e o manual citando todos os itens do RESUMO.
 - As **amostras** em `amostras/` são usadas diretamente pelos testes.
 - O que depende do Windows (EventLog, WMI, registro, janela) é testado à mão com o roteiro [`TESTE-NA-VM.txt`](TESTE-NA-VM.txt): disco com `Write-EventLog`, `.err` com linhas injetadas, `.err` renomeado/ausente, reinício normal e desligamento forçado da VM, modo sem janela e botões.
 

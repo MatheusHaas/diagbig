@@ -10,7 +10,9 @@ Antes de começar
 - Período padrão: 30 dias. Ele pode ser trocado na janela (7 / 30 / 90) antes de clicar em "Coletar novamente".
 - O nome do serviço do banco não importa: o DiagBIG acha qualquer serviço que rode mariadbd.exe ou mysqld.exe.
   No MariaDB instalado no padrão, o serviço se chama "MariaDB" e o .err fica em
-  C:\Program Files\MariaDB <versão>\data\<NOMEDOPC>.err. Abaixo, <SERVIÇO> = nome mostrado em "Serviço" na seção BANCO.
+  C:\Program Files\MariaDB <versão>\data\<NOMEDOPC>.err.
+  MySQL 5.1 (Arquivos de Programas): .err em C:\ProgramData\MySQL\MySQL Server 5.1\Data\<NOMEDOPC>.err.
+  MySQL 4 (C:\mysql): config em C:\WINDOWS\my.ini e log em C:\mysql\data\mysql.err. Abaixo, <SERVIÇO> = nome mostrado em "Serviço" na seção BANCO.
 
 
 1) Rodar sem nada na VM
@@ -108,7 +110,8 @@ Antes de começar
 
 
 Amostras (pasta amostras\)
-- mysql55_crash.err ........ MySQL 5.5: tabela crashed, Got error 145, chave incorreta, crash com stack.
+- mysql4_tabela_crashed.err  MySQL 4 (mysql.err, sem [ERROR]): tabela crashed, Got error 127, crash recovery.
+- mysql51_crash.err ........ MySQL 5.1: tabela crashed, Got error 145, chave incorreta, crash com stack.
 - mariadb104_corrupcao.err . MariaDB 10.4: página corrompida, tabela crashed, disco cheio, assertion.
 - mysql8_disco_cheio.err ... MySQL 8 (horário UTC): disco cheio, assertion + crash.
-- my_*.ini ................. my.ini com e sem log-error, caminhos com / e com \.
+- my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.

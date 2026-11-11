@@ -78,7 +78,7 @@ namespace DiagBIG.Tests
             d.LogCoverages.Add(new LogCoverage { LogName = "Sistema", Oldest = new DateTime(2026, 11, 1) });
             d.LogCoverages.Add(new LogCoverage { LogName = "Aplicativo", Oldest = new DateTime(2026, 1, 1) });
             d.LogClearedEvents.Add(Ev("Microsoft-Windows-Eventlog", 104, new DateTime(2026, 11, 2, 8, 0, 0), "O log Sistema foi limpo."));
-            d.ErrCoverages.Add(new ErrCoverage { Label = "BANCO (BIG_db)", FirstDate = new DateTime(2026, 11, 5), Truncated = true, FileSize = 300L * 1024 * 1024, BytesRead = 10L * 1024 * 1024 });
+            d.ErrCoverages.Add(new ErrCoverage { Label = "BANCO (MariaDB)", FirstDate = new DateTime(2026, 11, 5), Truncated = true, FileSize = 300L * 1024 * 1024, BytesRead = 10L * 1024 * 1024 });
 
             var occ = Enumerable.Range(0, 40).Select(i => Ev("disk", 7, new DateTime(2026, 11, 1).AddHours(i), "msg " + i)).ToArray();
             var disk = Block(occ);
@@ -102,7 +102,7 @@ namespace DiagBIG.Tests
             Assert.Contains("Log Sistema: log cobre desde 01/11/2026 — AVISO: não cobre o período escolhido", txt);
             Assert.Contains("Log Aplicativo: log cobre desde 01/01/2026\r\n", txt);
             Assert.Contains("AVISO: log de eventos LIMPO em 02/11/2026 08:00", txt);
-            Assert.Contains("BANCO (BIG_db): leitura do .err cobre desde 05/11/2026 (últimos 10,0 MB de 300,0 MB) — AVISO", txt);
+            Assert.Contains("BANCO (MariaDB): leitura do .err cobre desde 05/11/2026 (últimos 10,0 MB de 300,0 MB) — AVISO", txt);
 
             Assert.Contains("  DISCO: ATENÇÃO — 40 eventos (disk 7: 40x), último em 02/11/2026 15:00", txt);
             Assert.Contains("DESLIGAMENTOS: OK — nenhuma ocorrência no período", txt);

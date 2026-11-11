@@ -71,6 +71,7 @@ LIGA/DESLIGA
   SUSPENSÃO / VOLTOU DA SUSPENSÃO, e não como LIGOU / DESLIGOU.
 
 BANCO (nome do serviço)
+  Vale para MariaDB, MySQL 5.x/8 e MySQL 4 (em C:\mysql, log data\mysql.err).
   Erros do arquivo .err do MySQL/MariaDB: tabela "marked as crashed",
   página corrompida, disco cheio, crash do banco etc.
   O relatório mostra qual .err foi lido e como ele foi achado.

@@ -2,13 +2,13 @@
 141020  8:01:12 InnoDB: The InnoDB memory heap is disabled
 141020  8:01:13 InnoDB: Initializing buffer pool, size = 128.0M
 141020  8:01:13 [Note] Server hostname (bind-address): '0.0.0.0'; port: 3306
-141020  8:01:13 [Note] C:\BIG_db\bin\mysqld.exe: ready for connections.
-Version: '5.5.62'  socket: ''  port: 3306  MySQL Community Server (GPL)
-141021 14:22:07 [ERROR] C:\BIG_db\bin\mysqld.exe: Table '.\big\produtos' is marked as crashed and should be repaired
-141021 14:22:07 [Warning] Checking table:   '.\big\produtos'
-141021 14:25:40 [ERROR] C:\BIG_db\bin\mysqld.exe: Table '.\big\produtos' is marked as crashed and should be repaired
-141021 15:02:11 [ERROR] Got error 145 when reading table '.\big\estoque'
-141022 10:00:00 [ERROR] Incorrect key file for table '.\big\vendas.MYI'; try to repair it
+141020  8:01:13 [Note] C:\Program Files\MySQL\MySQL Server 5.1\bin\mysqld: ready for connections.
+Version: '5.1.73-community'  socket: ''  port: 3306  MySQL Community Server (GPL)
+141021 14:22:07 [ERROR] C:\Program Files\MySQL\MySQL Server 5.1\bin\mysqld: Table '.\loja\produtos' is marked as crashed and should be repaired
+141021 14:22:07 [Warning] Checking table:   '.\loja\produtos'
+141021 14:25:40 [ERROR] C:\Program Files\MySQL\MySQL Server 5.1\bin\mysqld: Table '.\loja\produtos' is marked as crashed and should be repaired
+141021 15:02:11 [ERROR] Got error 145 when reading table '.\loja\estoque'
+141022 10:00:00 [ERROR] Incorrect key file for table '.\loja\vendas.MYI'; try to repair it
 141022 10:03:15 - mysqld got exception 0xc0000005 ;
 This could be because you hit a bug. It is also possible that this binary
 or one of the libraries it was linked against is corrupt, improperly built,
@@ -33,4 +33,4 @@ terribly wrong...
 InnoDB: Starting crash recovery.
 InnoDB: Reading tablespace information from the .ibd files...
 141022 10:03:25  InnoDB: Waiting for the background threads to start
-141022 10:03:26 [Note] C:\BIG_db\bin\mysqld.exe: ready for connections.
+141022 10:03:26 [Note] C:\Program Files\MySQL\MySQL Server 5.1\bin\mysqld: ready for connections.

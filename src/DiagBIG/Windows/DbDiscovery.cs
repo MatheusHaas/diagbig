@@ -22,7 +22,7 @@ namespace DiagBIG.Windows
     internal class DbTarget
     {
         public DbService Service;      // null = achado por varredura
-        public string Label;           // "BANCO (BIG_db)"
+        public string Label;           // "BANCO (MariaDB)"
         public string ErrPath;         // null = não encontrado
         public string HowFound;
         public string NotFoundReason;
@@ -111,34 +111,42 @@ namespace DiagBIG.Windows
             ImagePathInfo ip = ImagePathParser.Parse(svc.ImagePath);
             string baseDir = DbPathResolver.BaseDirFromExe(ip.ExePath);
 
-            string ini = null;
+            // Com --defaults-file o MySQL lê só esse arquivo; sem ele, lê todos os padrões em ordem.
+            var files = new List<string>();
             if (ip.DefaultsFile != null)
             {
-                if (File.Exists(ip.DefaultsFile)) ini = ip.DefaultsFile;
+                if (File.Exists(ip.DefaultsFile)) files.Add(ip.DefaultsFile);
                 else t.Info.Add("AVISO: --defaults-file aponta para arquivo inexistente: " + ip.DefaultsFile);
             }
-            if (ini == null)
-                ini = DbPathResolver.IniCandidates(baseDir).FirstOrDefault(File.Exists);
-
-            MyIniOptions opt = new MyIniOptions();
-            if (ini != null)
+            bool fromDefaultsFile = files.Count > 0;
+            if (!fromDefaultsFile)
             {
-                try
-                {
-                    opt = MyIniParser.Parse(ReadSharedText(ini));
-                    t.Info.Add("Config ........: " + ini + (ip.DefaultsFile != null && ini == ip.DefaultsFile ? " (--defaults-file)" : " (achado na pasta base)"));
-                }
-                catch (Exception ex) { t.Info.Add("AVISO: não foi possível ler " + ini + ": " + ex.Message); }
+                string windir = null;
+                try { windir = Environment.GetEnvironmentVariable("windir"); } catch (Exception) { }
+                files.AddRange(DbPathResolver.IniCandidates(baseDir, windir).Where(File.Exists));
             }
-            else t.Info.Add("Config ........: nenhum my.ini/my.cnf encontrado (usando padrões)");
+
+            var parsed = new List<MyIniOptions>();
+            var read = new List<string>();
+            foreach (string f in files)
+            {
+                try { parsed.Add(MyIniParser.Parse(ReadSharedText(f))); read.Add(f); }
+                catch (Exception ex) { t.Info.Add("AVISO: não foi possível ler " + f + ": " + ex.Message); }
+            }
+            MyIniOptions opt = MyIniParser.Merge(parsed);
+            if (read.Count == 0) t.Info.Add("Config ........: nenhum my.ini/my.cnf encontrado (usando padrões)");
+            else if (fromDefaultsFile) t.Info.Add("Config ........: " + read[0] + " (--defaults-file)");
+            else t.Info.Add("Config ........: " + string.Join(" + ", read.ToArray()) +
+                            (read.Count > 1 ? " (lidos nessa ordem; o último prevalece)" : ""));
 
             DbPaths paths = DbPathResolver.Resolve(opt, baseDir, Environment.MachineName);
             t.Info.Add("Datadir .......: " + paths.DataDir);
             t.DataDir = paths.DataDir;
 
-            if (File.Exists(paths.ErrPath))
+            foreach (string candidate in new[] { paths.ErrPath }.Concat(paths.AlternateErrPaths))
             {
-                t.ErrPath = paths.ErrPath;
+                if (!File.Exists(candidate)) continue;
+                t.ErrPath = candidate;
                 t.HowFound = "pelo serviço " + svc.Name + " (" + paths.ErrRule + ")";
                 return t;
             }

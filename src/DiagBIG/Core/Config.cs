@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.3.1";
+        public const string Version = "1.4.0";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -34,7 +34,12 @@ namespace DiagBIG.Core
         // ---------------- Parte 2: banco MySQL/MariaDB ----------------
 
         /// <summary>Executáveis do servidor de banco (ImagePath do serviço / Application Error 1000).</summary>
-        public static readonly string[] DbProcessNames = { "mysqld.exe", "mariadbd.exe", "mysqld-nt.exe" };
+        /// MySQL 4 usa mysqld-nt / mysqld-max-nt / mysqld-opt etc.
+        public static readonly string[] DbProcessNames =
+        {
+            "mysqld.exe", "mariadbd.exe",
+            "mysqld-nt.exe", "mysqld-max-nt.exe", "mysqld-max.exe", "mysqld-opt.exe",
+        };
 
         /// <summary>Fontes do log Aplicativo consideradas do banco (contém, sem diferenciar maiúsculas).</summary>
         public static readonly string[] DbEventSources = { "mysql", "mariadb" };
