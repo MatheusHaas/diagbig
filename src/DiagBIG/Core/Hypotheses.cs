@@ -125,6 +125,12 @@ namespace DiagBIG.Core
                 result.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s)): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
                            "Fazer backup agora. " + (smartBad ? "" : "O SMART não acusou falha, mas SMART OK não descarta o disco: o setor ruim pode já ter sido remapeado ou o disco estar atrás de RAID. ") +
                            "chkdsk /r não conserta disco que está morrendo.");
+            int ntfsCorrupt = Occ(d, BlockTag.Disk).Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && o.EventId == "55");
+            if (ntfsCorrupt > 0)
+                result.Add("Sistema de arquivos corrompido (Ntfs 55, " + ntfsCorrupt + "x): o NTFS achou erro na estrutura do volume (pode vir de desligamento brusco, energia, controladora ou disco ruim). " +
+                           "Fazer backup ANTES de reparar, depois rodar chkdsk /scan e, na janela de manutenção, chkdsk /f (o /r também procura setor ruim e demora). " +
+                           "SFC/DISM não reparam o NTFS. Se voltar depois do chkdsk, suspeitar do disco, cabo, controladora ou energia" +
+                           (badSectors > 0 ? "; junto com o setor defeituoso acima, tratar como disco com falha." : "."));
             if (bsodDisk > 0 || diskEvents || smartBad)
             {
                 var ev = new List<string>();

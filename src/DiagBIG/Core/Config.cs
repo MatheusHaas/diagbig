@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.5.2";
+        public const string Version = "1.5.3";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };

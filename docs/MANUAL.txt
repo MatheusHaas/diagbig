@@ -51,7 +51,9 @@ DISCO
   defeituoso: acionar o técnico e/ou efetuar a troca do disco/servidor".
   SMART OK não descarta o disco;
   "disk 51/153" = falha de leitura/escrita; "Ntfs 55" = estrutura do disco
-  corrompida; "129" = disco/controladora travou e foi reiniciado.
+  corrompida (em CAUSAS PROVÁVEIS: backup antes, chkdsk /scan e depois
+  chkdsk /f; SFC/DISM não reparam o NTFS; se voltar, suspeitar do disco);
+  "129" = disco/controladora travou e foi reiniciado.
   Também lê os erros das controladoras RAID de servidor (Dell PERC,
   HP Smart Array, LSI, Adaptec). Com ATENÇÃO: suspeitar do disco e
   encaminhar ao N2.

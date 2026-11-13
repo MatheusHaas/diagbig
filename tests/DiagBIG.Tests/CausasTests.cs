@@ -195,6 +195,15 @@ namespace DiagBIG.Tests
         }
 
         [Fact]
+        public void Ntfs55_AdvisesBackupAndChkdsk()
+        {
+            var disk = Block(BlockTag.Disk, true, Ev("Microsoft-Windows-Ntfs", 55, "Foi encontrada uma estrutura corrompida"));
+            List<string> h = Hypotheses.Analyze(Data(disk));
+            Assert.Contains(h, x => x.StartsWith("Sistema de arquivos corrompido") && x.Contains("backup ANTES") && x.Contains("chkdsk /scan") && x.Contains("SFC/DISM não reparam"));
+            Assert.DoesNotContain(h, x => x.StartsWith("Disco com setor defeituoso"));
+        }
+
+        [Fact]
         public void OtherDiskEvent_IsNotBadSector()
         {
             var disk = Block(BlockTag.Disk, true, Ev("disk", 153, "A operação de E/S foi repetida"));
