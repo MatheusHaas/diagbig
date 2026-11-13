@@ -13,7 +13,7 @@
     <ApplicationIcon>Resources\diagbig.ico</ApplicationIcon>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <Version>1.5.1</Version>
+    <Version>1.5.2</Version>
     <Product>DiagBIG</Product>
     <Description>Coletor de logs de disco e banco para o suporte</Description>
     <!-- Sem DiagBIG.exe.config: um único .exe (o runtime v4 já é o padrão do assembly). -->

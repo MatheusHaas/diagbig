@@ -185,6 +185,23 @@ namespace DiagBIG.Tests
         }
 
         [Fact]
+        public void BadSector_SmartOk_AdvisesTechnicianOrReplacement()
+        {
+            var disk = Block(BlockTag.Disk, true, Ev("disk", 7, "O dispositivo \\Device\\Harddisk0\\DR0 tem um bloco inválido."));
+            var d = Data(disk);
+            d.Summary.Add(new SummaryItem { Label = "SMART", Status = CheckStatus.Ok, Text = "ok" });
+            List<string> h = Hypotheses.Analyze(d);
+            Assert.Contains(h, x => x.StartsWith("Disco com setor defeituoso") && x.Contains("acionar o técnico") && x.Contains("troca") && x.Contains("SMART OK não descarta"));
+        }
+
+        [Fact]
+        public void OtherDiskEvent_IsNotBadSector()
+        {
+            var disk = Block(BlockTag.Disk, true, Ev("disk", 153, "A operação de E/S foi repetida"));
+            Assert.DoesNotContain(Hypotheses.Analyze(Data(disk)), x => x.StartsWith("Disco com setor defeituoso"));
+        }
+
+        [Fact]
         public void NothingFound_NoHypothesis()
         {
             var d = Data(Block(BlockTag.Power, true), Block(BlockTag.Db, false), Block(BlockTag.Disk, true));

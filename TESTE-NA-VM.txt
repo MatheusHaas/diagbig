@@ -128,6 +128,10 @@ Amostras (pasta amostras\)
 - my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.
 
 
+N) Novidades da 1.5.2 (conferir na VM)
+   - Write-EventLog -LogName System -Source disk -EventId 7 -EntryType Error -Message "bloco inválido": em CAUSAS PROVÁVEIS deve
+     aparecer "Disco com setor defeituoso ... acionar o técnico e/ou efetuar a troca do disco/servidor". Com disk 153 não aparece.
+
 N) Novidades da 1.5.1 (conferir na VM)
    - RESUMO deve ter a linha "MEMÓRIA/HARDWARE" (OK em VM sem erro) e, depois do RESUMO, o bloco
      "CAUSAS PROVÁVEIS" ("Nenhum indício forte..." numa VM limpa). Seção 4 "MEMÓRIA RAM E HARDWARE" lista os pentes

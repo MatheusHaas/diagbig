@@ -46,7 +46,10 @@ Exemplo:
 O QUE CADA ITEM QUER DIZER
 --------------------------
 DISCO
-  Erros de disco e do sistema de arquivos. "disk 7" = setor defeituoso;
+  Erros de disco e do sistema de arquivos. "disk 7" = setor defeituoso
+  (bad block): aparece em CAUSAS PROVÁVEIS como "Disco com setor
+  defeituoso: acionar o técnico e/ou efetuar a troca do disco/servidor".
+  SMART OK não descarta o disco;
   "disk 51/153" = falha de leitura/escrita; "Ntfs 55" = estrutura do disco
   corrompida; "129" = disco/controladora travou e foi reiniciado.
   Também lê os erros das controladoras RAID de servidor (Dell PERC,

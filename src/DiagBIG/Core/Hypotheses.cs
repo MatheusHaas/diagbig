@@ -19,6 +19,17 @@ namespace DiagBIG.Core
         static readonly string[] DbMemoryErrorTerms = { "MAGIC_N", "Out of memory", "got signal 11" };
         static readonly string[] DbCrashTerms = { "got exception", "Assertion failure", "got signal" };
 
+        /// <summary>Texto (em português e inglês) que indica setor defeituoso numa mensagem de evento de disco.</summary>
+        static readonly string[] BadSectorTerms = { "bad block", "bad sector", "bloco inválido", "setor defeituoso", "setor danificado" };
+
+        /// <summary>Evento de disco que é setor defeituoso: disk 7 (bad block) ou mensagem que cite bad block/sector.</summary>
+        public static bool IsBadSector(Occurrence o)
+        {
+            if (o == null) return false;
+            if (string.Equals(Grouping.ShortSource(o.Source), "disk", StringComparison.OrdinalIgnoreCase) && o.EventId == "7") return true;
+            return ContainsAny(o.Message, null, BadSectorTerms);
+        }
+
         static IEnumerable<ReportBlock> Blocks(ReportData d, string tag)
         {
             return d.Sections.SelectMany(s => s.Blocks).Where(b => b.Tag == tag && b.Verified);
@@ -109,13 +120,19 @@ namespace DiagBIG.Core
             }
 
             // 2) disco
+            int badSectors = Occ(d, BlockTag.Disk).Count(IsBadSector);
+            if (badSectors > 0)
+                result.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s)): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
+                           "Fazer backup agora. " + (smartBad ? "" : "O SMART não acusou falha, mas SMART OK não descarta o disco: o setor ruim pode já ter sido remapeado ou o disco estar atrás de RAID. ") +
+                           "chkdsk /r não conserta disco que está morrendo.");
             if (bsodDisk > 0 || diskEvents || smartBad)
             {
                 var ev = new List<string>();
                 if (bsodDisk > 0) ev.Add("tela azul de disco: " + string.Join(", ", infos.Where(i => i.Suspect == BugcheckSuspect.Disco).Select(i => i.Name).Distinct().ToArray()));
                 if (diskEvents) ev.Add("eventos de disco/NTFS");
                 if (smartBad) ev.Add("SMART/confiabilidade em ATENÇÃO");
-                result.Add("Disco, cabo ou controladora sob suspeita (" + string.Join("; ", ev.ToArray()) + "). Fazer backup agora e rodar chkdsk /scan e a ferramenta do fabricante do disco.");
+                result.Add("Disco, cabo ou controladora sob suspeita (" + string.Join("; ", ev.ToArray()) + "). Fazer backup agora e rodar chkdsk /scan e a ferramenta do fabricante do disco." +
+                           (diskEvents && !smartBad && d.Summary.Any(x => x.Label == "SMART" && x.Status == CheckStatus.Ok) ? " SMART OK não descarta o disco quando há eventos de disco." : ""));
             }
 
             // 3) driver
