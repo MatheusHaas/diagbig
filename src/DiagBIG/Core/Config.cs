@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.5.0";
+        public const string Version = "1.5.1";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -29,6 +29,14 @@ namespace DiagBIG.Core
         /// <summary>Avisos de qualquer fonte de disco/controladora: 129 = "Reset to device" (disco travando/timeout).</summary>
         public static readonly int[] StorageWarningIds = { 129 };
 
+        /// <summary>volmgr 46/161/162: falha ao gravar o despejo de memória. Consequência de tela azul, não entra em DISCO.</summary>
+        public const string DumpFailureSource = "volmgr";
+        public static readonly int[] DumpFailureIds = { 46, 161, 162 };
+
+        /// <summary>Contadores de confiabilidade (fallback do SMART): acima disso o disco entra em ATENÇÃO.</summary>
+        public const int WearAttentionPercent = 80;
+        public const int DiskTempAttentionC = 70;
+
         // ---------------- Detecção de RAID (só informativa) ----------------
         /// <summary>Driver de controladora que é sempre RAID.</summary>
         public static readonly string[] RaidDrivers = { "megasas", "percsas", "hpcisss", "hpsamd", "smartpqi", "arcmsr" };
@@ -47,6 +55,18 @@ namespace DiagBIG.Core
         /// <summary>Evento de "log limpo".</summary>
         public const string LogClearedProvider = "Microsoft-Windows-Eventlog";
         public const int LogClearedId = 104;
+
+        // ---------------- Hardware / memória (possíveis causadores) ----------------
+        /// <summary>WHEA-Logger: erros de hardware (RAM, CPU, PCIe) detectados/corrigidos pela plataforma. Aviso, Erro e Crítico.</summary>
+        public const string WheaProvider = "Microsoft-Windows-WHEA-Logger";
+        /// <summary>Resultado do Diagnóstico de Memória do Windows (mdsched). 1102 = erros de hardware detectados.</summary>
+        public const string MemDiagProvider = "Microsoft-Windows-MemoryDiagnostics-Results";
+        public const int MemDiagErrorId = 1102;
+        /// <summary>Resource-Exhaustion-Detector 2004: pouca memória virtual.</summary>
+        public const string ResourceExhaustionProvider = "Microsoft-Windows-Resource-Exhaustion-Detector";
+        public const int ResourceExhaustionId = 2004;
+        /// <summary>Quantas quedas do banco no período para falar em "loop de crash".</summary>
+        public const int CrashLoopThreshold = 5;
 
         // ---------------- Parte 2: banco MySQL/MariaDB ----------------
 

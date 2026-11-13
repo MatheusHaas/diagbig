@@ -126,3 +126,17 @@ Amostras (pasta amostras\)
 - mariadb104_corrupcao.err . MariaDB 10.4: página corrompida, tabela crashed, disco cheio, assertion.
 - mysql8_disco_cheio.err ... MySQL 8 (horário UTC): disco cheio, assertion + crash.
 - my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.
+
+
+N) Novidades da 1.5.1 (conferir na VM)
+   - RESUMO deve ter a linha "MEMÓRIA/HARDWARE" (OK em VM sem erro) e, depois do RESUMO, o bloco
+     "CAUSAS PROVÁVEIS" ("Nenhum indício forte..." numa VM limpa). Seção 4 "MEMÓRIA RAM E HARDWARE" lista os pentes
+     (ou "o Windows não informou" em VM).
+   - SMART: em VM continua NÃO VERIFICADO; num PC com NVMe deve passar a mostrar "Confiabilidade: ..." (saúde, °C, desgaste).
+   - volmgr 161 NÃO deve mais aparecer em DISCO (Write-EventLog -Source volmgr -EventId 161 -EntryType Error: some do DISCO e
+     aparece "Ignorados 1 evento(s) volmgr 46/161/162").
+   - WHEA: Write-EventLog não consegue gravar em WHEA-Logger; basta conferir que a linha não quebra a coleta.
+   - Tela azul: o código aparece com nome (ex.: "0x1A MEMORY_MANAGEMENT — suspeita: RAM ...") e entra em CAUSAS PROVÁVEIS.
+   - my.ini: colocar no [mysqld] "innodb_doublewrite=OFF", "innodb_flush_log_at_trx_commit=2" e "innodb_force_recovery=1",
+     reiniciar o serviço e coletar: o bloco do banco mostra 3 linhas "AVISO: ..." e a linha BANCO do RESUMO ganha
+     "(my.ini com opção de risco (ver AVISO))". Tirar as linhas e conferir que os avisos somem.

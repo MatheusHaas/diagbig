@@ -153,8 +153,96 @@ namespace DiagBIG.Windows
             return block;
         }
 
+        public static List<MemoryModule> MemoryModules()
+        {
+            var list = new List<MemoryModule>();
+            using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT BankLabel, DeviceLocator, Capacity, Speed, Manufacturer, PartNumber FROM Win32_PhysicalMemory", Options()))
+                foreach (ManagementObject mo in s.Get())
+                    using (mo)
+                    {
+                        object cap = mo["Capacity"], speed = mo["Speed"];
+                        list.Add(new MemoryModule
+                        {
+                            Slot = Convert.ToString(mo["DeviceLocator"], CultureInfo.InvariantCulture) ?? Convert.ToString(mo["BankLabel"], CultureInfo.InvariantCulture),
+                            Capacity = cap == null ? 0 : Convert.ToInt64(cap, CultureInfo.InvariantCulture),
+                            SpeedMHz = speed == null ? 0 : Convert.ToInt32(speed, CultureInfo.InvariantCulture),
+                            Manufacturer = Convert.ToString(mo["Manufacturer"], CultureInfo.InvariantCulture),
+                            PartNumber = Convert.ToString(mo["PartNumber"], CultureInfo.InvariantCulture),
+                        });
+                    }
+            return list;
+        }
+
+        static long? Num(object v) { return v == null ? (long?)null : Convert.ToInt64(v, CultureInfo.InvariantCulture); }
+
+        static string BusTypeName(object v)
+        {
+            switch (v == null ? -1 : Convert.ToInt32(v, CultureInfo.InvariantCulture))
+            {
+                case 3: return "ATA"; case 7: return "USB"; case 8: return "RAID"; case 10: return "SAS";
+                case 11: return "SATA"; case 16: return "Storage Spaces"; case 17: return "NVMe"; default: return "";
+            }
+        }
+
+        /// <summary>
+        /// Alternativa ao SMART clássico (root\Microsoft\Windows\Storage: MSFT_PhysicalDisk + contadores de confiabilidade,
+        /// Windows 8/Server 2012 em diante). Funciona em muitos NVMe. Retorna null se não houver dados.
+        /// </summary>
+        static List<DiskHealth> ReliabilityCounters()
+        {
+            var list = new List<DiskHealth>();
+            var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\Storage");
+            scope.Connect();
+            using (var s = new ManagementObjectSearcher(scope, new ObjectQuery("SELECT * FROM MSFT_PhysicalDisk"), Options()))
+                foreach (ManagementObject mo in s.Get())
+                    using (mo)
+                    {
+                        var h = new DiskHealth
+                        {
+                            Name = Convert.ToString(mo["FriendlyName"], CultureInfo.InvariantCulture),
+                            BusType = BusTypeName(mo["BusType"]),
+                            HealthStatus = mo["HealthStatus"] == null ? (int?)null : Convert.ToInt32(mo["HealthStatus"], CultureInfo.InvariantCulture),
+                        };
+                        try
+                        {
+                            foreach (ManagementObject rc in mo.GetRelated("MSFT_StorageReliabilityCounter"))
+                                using (rc)
+                                {
+                                    h.Temperature = (int?)Num(rc["Temperature"]);
+                                    h.Wear = (int?)Num(rc["Wear"]);
+                                    h.ReadErrorsUncorrected = Num(rc["ReadErrorsUncorrected"]);
+                                    h.WriteErrorsUncorrected = Num(rc["WriteErrorsUncorrected"]);
+                                    h.PowerOnHours = Num(rc["PowerOnHours"]);
+                                    break;
+                                }
+                        }
+                        catch (Exception) { /* sem contadores: ainda vale o HealthStatus */ }
+                        list.Add(h);
+                    }
+            return list;
+        }
+
         static ReportBlock SmartNotVerified(ReportBlock block, SummaryItem summary, string reason, RaidInfo raid)
         {
+            if (raid == null || !raid.Found)
+            {
+                try
+                {
+                    List<DiskHealth> disks = ReliabilityCounters();
+                    if (disks.Count > 0)
+                    {
+                        block.Info.Add("SMART clássico indisponível (" + reason + "); usando os contadores de confiabilidade do Windows:");
+                        var lines = new List<string>();
+                        SummaryItem r = Storage.EvaluateHealth(disks, lines);
+                        block.Info.AddRange(lines);
+                        summary.Status = r.Status;
+                        summary.Text = r.Text;
+                        block.Info.Add("Resultado: " + ReportBuilder.StatusText(r.Status) + " — " + r.Text);
+                        return block;
+                    }
+                }
+                catch (Exception ex) { block.Info.Add("Contadores de confiabilidade indisponíveis: " + ex.Message); }
+            }
             summary.Status = CheckStatus.NaoVerificado;
             summary.Text = reason;
             block.Info.Add("Resultado: NÃO VERIFICADO — " + reason);

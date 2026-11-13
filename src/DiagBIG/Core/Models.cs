@@ -33,11 +33,26 @@ namespace DiagBIG.Core
         public string SummaryNote { get; set; }
         /// <summary>true = itens são eventos do Windows; false = linhas do .err.</summary>
         public bool IsEvents { get; set; } = true;
+        /// <summary>Identifica o bloco para a análise de causas (BlockTag).</summary>
+        public string Tag { get; set; }
+        /// <summary>Avisos do bloco (ex.: opções perigosas do my.ini), mostrados como AVISO e nas causas prováveis.</summary>
+        public List<string> Warnings { get; } = new List<string>();
 
         public static ReportBlock NotVerified(string title, string reason, bool isEvents = true)
         {
             return new ReportBlock { Title = title, Verified = false, NotVerifiedReason = reason, IsEvents = isEvents };
         }
+    }
+
+    /// <summary>Etiquetas dos blocos usadas por Hypotheses.</summary>
+    public static class BlockTag
+    {
+        public const string Disk = "disk";
+        public const string Smart = "smart";
+        public const string Power = "power";
+        public const string Hardware = "hardware";
+        public const string Db = "db";
+        public const string DbEvents = "dbevents";
     }
 
     public class ReportSection
@@ -90,6 +105,8 @@ namespace DiagBIG.Core
         public string LogClearedError { get; set; }
         public List<ErrCoverage> ErrCoverages { get; } = new List<ErrCoverage>();
         public List<SummaryItem> Summary { get; } = new List<SummaryItem>();
+        /// <summary>Causas prováveis (calculadas por Hypotheses a partir dos blocos).</summary>
+        public List<string> Hypotheses { get; } = new List<string>();
         public List<ReportSection> Sections { get; } = new List<ReportSection>();
     }
 }

@@ -11,6 +11,12 @@ namespace DiagBIG.Core
         /// <summary>Valor de log-error/log_error. Vazio = opção presente sem valor.</summary>
         public string LogError { get; set; }
         public bool LogErrorDefined { get; set; }
+        /// <summary>innodb_doublewrite (ou skip-innodb-doublewrite = "OFF"). null = não definido (padrão ON).</summary>
+        public string DoubleWrite { get; set; }
+        /// <summary>innodb_flush_log_at_trx_commit. null = não definido (padrão 1).</summary>
+        public string FlushLogAtTrxCommit { get; set; }
+        /// <summary>innodb_force_recovery. null = não definido (padrão 0).</summary>
+        public string ForceRecovery { get; set; }
     }
 
     /// <summary>Lê datadir, basedir e log-error do my.ini / my.cnf.</summary>
@@ -45,6 +51,10 @@ namespace DiagBIG.Core
                 {
                     case "datadir": if (!string.IsNullOrEmpty(value)) opt.DataDir = WinPath.Normalize(value); break;
                     case "basedir": if (!string.IsNullOrEmpty(value)) opt.BaseDir = WinPath.Normalize(value); break;
+                    case "innodb_doublewrite": opt.DoubleWrite = value ?? "ON"; break;
+                    case "skip_innodb_doublewrite": opt.DoubleWrite = "OFF"; break;
+                    case "innodb_flush_log_at_trx_commit": if (!string.IsNullOrEmpty(value)) opt.FlushLogAtTrxCommit = value; break;
+                    case "innodb_force_recovery": if (!string.IsNullOrEmpty(value)) opt.ForceRecovery = value; break;
                     case "log_error":
                         opt.LogErrorDefined = true;
                         opt.LogError = string.IsNullOrEmpty(value) ? "" : WinPath.Normalize(value);
@@ -64,6 +74,9 @@ namespace DiagBIG.Core
                 if (!string.IsNullOrEmpty(o.BaseDir)) r.BaseDir = o.BaseDir;
                 if (!string.IsNullOrEmpty(o.DataDir)) r.DataDir = o.DataDir;
                 if (o.LogErrorDefined) { r.LogErrorDefined = true; r.LogError = o.LogError; }
+                if (o.DoubleWrite != null) r.DoubleWrite = o.DoubleWrite;
+                if (o.FlushLogAtTrxCommit != null) r.FlushLogAtTrxCommit = o.FlushLogAtTrxCommit;
+                if (o.ForceRecovery != null) r.ForceRecovery = o.ForceRecovery;
             }
             return r;
         }

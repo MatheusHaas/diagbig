@@ -80,7 +80,8 @@ Equivale a "Filtrar log atual" no Visualizador de Eventos, só que automático.
 - **Crítico + Erro** de qualquer fonte cujo nome **contenha** `disk`, `ntfs`, `volmgr`, `atapi`, `storahci`, `stornvme` ou `iastor`, ou os drivers de **controladora RAID de servidor**: `megasas`/`percsas` (Dell PERC, LSI MegaRAID), `hpcisss`/`hpsamd` (HP Smart Array), `smartpqi` (HPE/Microsemi), `lsi_sas`, `arcsas` (Adaptec) e `arcmsr` (Areca). O XPath do log de eventos não tem `contains()`, então a fonte é filtrada no código.
 - **Avisos** da fonte `disk` com IDs **51, 52 e 153**, e o aviso **129 ("Reset to device")** de qualquer uma dessas fontes, que é o sinal clássico de disco travando atrás de uma controladora.
 - **RAID explícito no cabeçalho** (`RAID: SIM / NÃO / NÃO VERIFICADO`), a partir de `Win32_SCSIController` (nome e driver) e dos modelos em `Win32_DiskDrive` (ex.: `DELL PERC H730 ... Disk Device`, `HP LOGICAL VOLUME`). Os drivers `lsi_sas`, `arcsas` e `iaStor` também servem a controladoras sem RAID (VMware, Intel RST em AHCI), então só contam se o nome da controladora disser RAID.
-- **SMART** via WMI (`root\wmi`, `MSStorageDriver_FailurePredictStatus`): `PredictFailure = True` → ATENÇÃO. Em VM, RAID e alguns NVMe não há suporte → `NÃO VERIFICADO`, sem quebrar; com RAID, o texto aponta a ferramenta da controladora (OpenManage/iDRAC, HPE SSA/iLO, MegaRAID Storage Manager). Também lista modelo e status dos discos (`Win32_DiskDrive`).
+- **SMART** via WMI (`root\wmi`, `MSStorageDriver_FailurePredictStatus`): `PredictFailure = True` → ATENÇÃO. Em VM, RAID e alguns NVMe não há suporte → `NÃO VERIFICADO`, sem quebrar; com RAID, o texto aponta a ferramenta da controladora (OpenManage/iDRAC, HPE SSA/iLO, MegaRAID Storage Manager). Também lista modelo e status dos discos (`Win32_DiskDrive`). Quando o SMART clássico não existe (típico em NVMe), cai para os **contadores de confiabilidade** (`root\Microsoft\Windows\Storage`: `MSFT_PhysicalDisk` + `MSFT_StorageReliabilityCounter`): saúde ≠ Saudável, desgaste ≥ 80 %, temperatura ≥ 70 °C ou erros não corrigidos → ATENÇÃO.
+- **`volmgr` 46/161/162** (falha ao gravar o despejo de memória) **não** entram em DISCO: são consequência de tela azul. O bloco diz quantos foram ignorados.
 
 ### 2. Reinícios e desligamentos
 
@@ -93,6 +94,23 @@ Uma consulta ao log Sistema alimenta dois blocos.
 | Kernel-Power **41** | Reiniciou sem desligar corretamente. O DiagBIG **interpreta os dados do evento**: `BugcheckCode ≠ 0` → **tela azul** (com o código); `PowerButtonTimestamp ≠ 0` → **botão de energia segurado**; tudo zerado → **provável queda/corte de energia, reset ou travamento** |
 | EventLog **6008** | "O desligamento anterior às HH:MM foi inesperado": dá o horário da queda |
 | BugCheck **1001** | Tela azul registrada |
+
+O código da tela azul é **traduzido** (tabela em `Core/Bugchecks.cs`), com o suspeito mais comum: `0x1A MEMORY_MANAGEMENT` → RAM; `0x7A` → disco; `0xD1` → driver, etc.
+
+### 2b. Memória RAM e hardware (possíveis causadores)
+
+Eventos **WHEA-Logger** (erro de hardware: RAM, CPU, PCIe), **MemoryDiagnostics-Results 1102** (o teste de memória do Windows achou erros) e **Resource-Exhaustion-Detector 2004** (pouca memória virtual), mais a lista de pentes (`Win32_PhysicalMemory`) com aviso de pentes diferentes.
+
+### 2d. Avisos do `my.ini`
+
+O DiagBIG lê do `my.ini` (seções `[mysqld]`/`[mariadb]`...) e avisa, no bloco do banco, no resumo e em CAUSAS PROVÁVEIS: `innodb_doublewrite=OFF` (sem proteção contra página rasgada em queda de energia, tela azul, hardware ruim ou crash), `innodb_flush_log_at_trx_commit` 0 ou 2 (perde ~1 s de transações confirmadas numa queda) e `innodb_force_recovery` > 0 (banco em modo de recuperação: só para manutenção/dump e com a porta do banco trocada, para o sistema não conectar). Se o relatório já achou queda de energia, tela azul, erro de hardware ou de disco, o aviso cita isso. Lógica em `Core/DbConfigWarnings.cs`.
+
+### 2c. Causas prováveis
+
+Quando o `.err` traz **erro de memória do banco** (`ROW_PREBUILT_FETCH_MAGIC_N`, `Out of memory`, `got signal 11`), entra também um **PROCEDIMENTO**: se persistir mesmo com `innodb_force_recovery=2` e `OPTIMIZE` completo, **reinstalar o MariaDB com a equipe de serviços** (dump em manutenção com a porta trocada, reinstalar, restaurar) é uma opção; `REPAIR`/`OPTIMIZE` não resolvem porque o problema não está numa tabela.
+
+
+`Core/Hypotheses.cs` cruza tela azul, memória/WHEA, disco, energia e `.err` e imprime **CAUSAS PROVÁVEIS** logo após o RESUMO (e no texto curto). Ex.: tela azul `0x1A` + banco corrompido/caindo → "possível causa: RAM defeituosa, não confirmada; testar a memória ANTES de restaurar o banco". O relatório avisa que qualquer uma das causas listadas pode ser a origem. Também aponta disco, driver, queda de energia, botão de energia, banco em loop de crash e pouco espaço. É indício, não prova.
 
 **Linha do tempo de liga/desliga** (mais recente primeiro): `6005` ligou, `6006` desligou corretamente, `User32 1074` reinício/desligamento **solicitado, com usuário, processo e motivo** (ex.: Windows Update), `Kernel-Power 42` suspensão, `Power-Troubleshooter 1` voltou da suspensão. No resumo vira a linha `LIGA/DESLIGA`: inicializações, desligamentos corretos, solicitados, inesperados e "ligado desde" (`Win32_OperatingSystem.LastBootUpTime`).
 
@@ -239,7 +257,7 @@ TESTE-NA-VM.txt        roteiro de teste manual no Windows
 
 ## Testes
 
-- **97 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath (inclusive executáveis do MySQL 4 e `mysqld` sem `.exe` do 5.1), my.ini (WinMySQLadmin do MySQL 4, instalador do 5.1, ordem de leitura), regras do `.err` (inclusive `mysql.err`), datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, regra de eventos de disco e detecção de RAID (incluindo os falsos positivos de VM e de Intel RST), retenção de relatórios e o manual citando todos os itens do RESUMO.
+- **132 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath (inclusive executáveis do MySQL 4 e `mysqld` sem `.exe` do 5.1), my.ini (WinMySQLadmin do MySQL 4, instalador do 5.1, ordem de leitura), regras do `.err` (inclusive `mysql.err`), datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, regra de eventos de disco e detecção de RAID (incluindo os falsos positivos de VM e de Intel RST), retenção de relatórios e o manual citando todos os itens do RESUMO.
 - As **amostras** em `amostras/` são usadas diretamente pelos testes.
 - O que depende do Windows (EventLog, WMI, registro, janela) é testado à mão com o roteiro [`TESTE-NA-VM.txt`](TESTE-NA-VM.txt): disco com `Write-EventLog`, `.err` com linhas injetadas, `.err` renomeado/ausente, reinício normal e desligamento forçado da VM, modo sem janela e botões.
 
@@ -249,7 +267,8 @@ Tudo o que é ajustável está em [`src/DiagBIG/Core/Config.cs`](src/DiagBIG/Cor
 
 ## Limitações conhecidas
 
-- **SMART** não funciona em VM, em boa parte dos RAIDs e em alguns NVMe (fica `NÃO VERIFICADO`, como esperado).
+- **SMART** clássico não funciona em VM, em boa parte dos RAIDs e em alguns NVMe; nos NVMe o DiagBIG tenta os contadores de confiabilidade e só fica `NÃO VERIFICADO` se eles também não existirem (VM, RAID).
+- O DiagBIG **não roda teste de memória**: ele só lê o que o Windows já registrou. Sem `mdsched`/MemTest86 feito, a RAM só é suspeita por indício.
 - Com **Inicialização Rápida**, "Desligar" não aparece como desligamento na linha do tempo (é hibernação).
 - O `.err` é lido só nos **últimos 10 MB**; o cabeçalho mostra até onde a leitura alcançou.
 - Se o log do Windows foi sobrescrito ou limpo, o período anterior não existe mais; o relatório avisa.

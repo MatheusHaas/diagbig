@@ -62,14 +62,23 @@ namespace DiagBIG.Windows
             // ---------- Parte 1: disco ----------
             progress("Lendo eventos de disco/NTFS...");
             var diskSection = new ReportSection { Title = "DISCO / NTFS" };
+            int dumpFailures = 0;
             ReportBlock disk = RunEvents("EVENTOS DE DISCO/NTFS", () =>
             {
                 string xpath = "*[System[((Level=1 or Level=2) or (Level=3 and " +
                                EventLogs.IdsFilter(Config.DiskWarningIds.Concat(Config.StorageWarningIds)) + ")) and " + time + "]]";
                 bool capped;
-                var list = EventLogs.Query("System", xpath, rec => Storage.IsDiskEvent(rec.ProviderName, rec.Level ?? 0, rec.Id), out capped);
+                var list = EventLogs.Query("System", xpath, rec =>
+                {
+                    if (Storage.IsDumpFailure(rec.ProviderName, rec.Id)) { dumpFailures++; return false; }
+                    return Storage.IsDiskEvent(rec.ProviderName, rec.Level ?? 0, rec.Id);
+                }, out capped);
                 return Tuple(list, capped);
             });
+            disk.Tag = BlockTag.Disk;
+            if (dumpFailures > 0)
+                disk.Info.Add("Ignorados " + dumpFailures + " evento(s) volmgr " + string.Join("/", Config.DumpFailureIds.Select(i => i.ToString()).ToArray()) +
+                              " (falha ao gravar o despejo de memória): consequência de tela azul, não defeito de disco.");
             disk.Info.Insert(0, "Log Sistema: Crítico/Erro de " + string.Join(", ", Config.DiskSources) +
                                 "; avisos disk " + string.Join("/", Config.DiskWarningIds.Select(i => i.ToString()).ToArray()) +
                                 "; aviso 129 (reset do dispositivo) dessas fontes.");
@@ -80,7 +89,9 @@ namespace DiagBIG.Windows
             try { d.Raid = SystemInfo.DetectRaid(); }
             catch (Exception ex) { d.RaidError = "falha ao consultar controladoras via WMI: " + ex.Message; }
             SummaryItem smartSummary;
-            diskSection.Blocks.Add(SystemInfo.Smart(d.Raid, out smartSummary));
+            ReportBlock smartBlock = SystemInfo.Smart(d.Raid, out smartSummary);
+            smartBlock.Tag = BlockTag.Smart;
+            diskSection.Blocks.Add(smartBlock);
             d.Summary.Add(smartSummary);
             d.Sections.Add(diskSection);
 
@@ -94,6 +105,7 @@ namespace DiagBIG.Windows
                 power = EventLogs.Query("System", PowerXPath(time), null, out capped);
                 return Tuple(power.Where(o => PowerEvents.IsUnexpected(PowerEvents.Classify(o.Source, o.EventId))).ToList(), capped);
             });
+            shut.Tag = BlockTag.Power;
             shut.Info.Add("Queda de energia / desligamento forçado é causa comum de banco corrompido.");
             shut.Info.Add("No Kernel-Power 41 vem a interpretação: tela azul, botão de energia ou provável queda de energia.");
             powerSection.Blocks.Add(shut);
@@ -121,6 +133,27 @@ namespace DiagBIG.Windows
             }
             powerSection.Blocks.Add(timeline);
             d.Sections.Add(powerSection);
+
+            // ---------- Hardware / memória (possíveis causadores) ----------
+            progress("Verificando memória RAM e erros de hardware...");
+            var hwSection = new ReportSection { Title = "MEMÓRIA RAM E HARDWARE" };
+            ReportBlock hw = RunEvents("ERROS DE HARDWARE (WHEA) E DIAGNÓSTICO DE MEMÓRIA", () =>
+            {
+                string xpath = "*[System[(Provider[@Name='" + Config.WheaProvider + "'] and (Level=1 or Level=2 or Level=3)) or " +
+                               "(Provider[@Name='" + Config.MemDiagProvider + "'] and EventID=" + Config.MemDiagErrorId + ") or " +
+                               "(Provider[@Name='" + Config.ResourceExhaustionProvider + "'] and EventID=" + Config.ResourceExhaustionId + ")" +
+                               " and " + time + "]]";
+                bool capped;
+                return Tuple(EventLogs.Query("System", xpath, null, out capped), capped);
+            });
+            hw.Tag = BlockTag.Hardware;
+            try { hw.Info.InsertRange(0, Memory.Describe(SystemInfo.MemoryModules())); }
+            catch (Exception ex) { hw.Info.Insert(0, "Pentes de RAM indisponíveis: " + ex.Message); }
+            hw.Info.Add("WHEA = erro de hardware (RAM, CPU, PCIe); Resource-Exhaustion 2004 = pouca memória virtual.");
+            hw.Info.Add("O Windows só registra o teste de memória se ele rodou: se nunca rodou, executar mdsched.exe ou MemTest86.");
+            hwSection.Blocks.Add(hw);
+            d.Summary.Add(ReportBuilder.Summarize("MEMÓRIA/HARDWARE", new[] { hw }));
+            d.Sections.Add(hwSection);
 
             // ---------- Parte 2: banco ----------
             progress("Procurando serviços do banco...");
@@ -155,6 +188,7 @@ namespace DiagBIG.Windows
             {
                 progress("Lendo " + (t.ErrPath ?? t.Label) + "...");
                 ReportBlock b = AnalyzeTarget(t, d);
+                b.Tag = BlockTag.Db;
                 dbSection.Blocks.Add(b);
                 d.Summary.Add(ReportBuilder.Summarize(t.Label, new[] { b }));
             }
@@ -185,12 +219,14 @@ namespace DiagBIG.Windows
                 bool capped;
                 return Tuple(EventLogs.Query("System", xpath, rec => EventLogs.Mentions(rec, terms), out capped), capped);
             });
+            app.Tag = BlockTag.DbEvents;
             evSection.Blocks.Add(app);
             evSection.Blocks.Add(scm);
             d.Summary.Add(ReportBuilder.Summarize("EVENTOS DO BANCO NO WINDOWS", new[] { app, scm }));
             d.Sections.Add(evSection);
 
             progress("Montando relatório...");
+            try { d.Hypotheses.AddRange(Hypotheses.Analyze(d)); } catch (Exception) { }
             var r = new CollectionResult { Data = d };
             r.FullText = ReportBuilder.BuildFull(d);
             r.ResumoText = ReportBuilder.BuildResumo(d);
@@ -204,6 +240,12 @@ namespace DiagBIG.Windows
         {
             var b = new ReportBlock { Title = t.Label, IsEvents = false };
             b.Info.AddRange(t.Info);
+            if (t.Options != null)
+            {
+                b.Warnings.AddRange(DbConfigWarnings.Evaluate(t.Options, Hypotheses.RiskReasons(d)));
+                if (b.Warnings.Count > 0)
+                    b.SummaryNote = "my.ini com opção de risco (ver AVISO)";
+            }
             if (t.ErrPath == null)
             {
                 b.Verified = false;
@@ -233,7 +275,8 @@ namespace DiagBIG.Windows
                                ReportBuilder.DateTimeShort(f.LastWriteTime) + ", " + ReportBuilder.FormatBytes(f.Length) + ")");
                 if (others.Count > 0)
                     notes.Add("outro .err alterado no período não lido: " + string.Join(", ", others.Select(f => f.Name).ToArray()));
-                if (notes.Count > 0) b.SummaryNote = string.Join("; ", notes.ToArray());
+                if (notes.Count > 0)
+                    b.SummaryNote = string.Join("; ", (b.SummaryNote != null ? new[] { b.SummaryNote } : new string[0]).Concat(notes).ToArray());
                 b.Occurrences.AddRange(an.Occurrences);
             }
             catch (Exception ex)

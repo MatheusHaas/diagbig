@@ -8,6 +8,7 @@ O DiagBIG lê os logs do PC do cliente e mostra, em poucos segundos, se há
 sinais de problema em:
   - DISCO (erros de disco/NTFS e SMART)
   - REINÍCIOS E DESLIGAMENTOS (queda de energia, botão de energia, tela azul)
+  - MEMÓRIA RAM E HARDWARE (erros WHEA, teste de memória, pentes instalados)
   - BANCO MySQL/MariaDB (erros do arquivo .err)
 
 Ele SÓ LÊ. Não altera nada no Windows, nos serviços nem no banco, e não
@@ -59,16 +60,25 @@ RAID (no cabeçalho, em IDENTIFICAÇÃO)
   na ferramenta da controladora (Dell OpenManage/iDRAC, HPE SSA/iLO,
   MegaRAID Storage Manager).
 
+  O evento volmgr 161/162/46 ("falha ao criar o arquivo de despejo") NÃO é
+  defeito de disco: é consequência de tela azul. Ele fica fora do DISCO e o
+  relatório só diz quantos foram ignorados.
+
 SMART
   O próprio disco avisando que vai falhar. ATENÇÃO aqui é grave: backup já.
-  Em máquina virtual, RAID e alguns NVMe é normal dar NÃO VERIFICADO.
+  Quando o SMART clássico não existe (muito NVMe), o DiagBIG usa os
+  contadores de confiabilidade do Windows (saúde, desgaste, temperatura,
+  erros não corrigidos). ATENÇÃO se a saúde não for "Saudável", desgaste
+  >= 80%, temperatura >= 70 °C ou houver erro de leitura/escrita não corrigido.
+  Em máquina virtual e RAID é normal dar NÃO VERIFICADO.
 
 DESLIGAMENTOS INESPERADOS
   O PC desligou sem desligar o Windows. Na seção "REINÍCIOS E DESLIGAMENTOS",
   a "Interpretação" do Kernel-Power 41 diz o provável motivo:
     - provável QUEDA/CORTE DE ENERGIA, reset ou travamento total;
     - BOTÃO DE ENERGIA pressionado/segurado;
-    - TELA AZUL (com o código).
+    - TELA AZUL (com o código e o nome, ex.: 0x1A MEMORY_MANAGEMENT, e quem
+      costuma causar: RAM, disco, driver).
   O EventLog 6008 diz o horário em que o PC caiu.
   Queda de energia é causa comum de banco corrompido.
 
@@ -80,11 +90,42 @@ LIGA/DESLIGA
   Obs.: no Windows 10/11 com Inicialização Rápida, "Desligar" aparece como
   SUSPENSÃO / VOLTOU DA SUSPENSÃO, e não como LIGOU / DESLIGOU.
 
+MEMÓRIA/HARDWARE
+  Erros de hardware que o Windows registrou (WHEA: RAM, CPU, PCIe), erros do
+  Diagnóstico de Memória do Windows (mdsched) e falta de memória virtual.
+  Lista também os pentes de RAM e avisa se são diferentes entre si.
+  Se o teste de memória nunca rodou, o log não tem nada: rode mdsched.exe ou
+  MemTest86 quando houver tela azul 0x1A/0x50/0x4E ou banco corrompido.
+
+CAUSAS PROVÁVEIS
+  PROCEDIMENTO de reinstalação: quando o .err mostra erro de memória do banco
+  (ex.: assertion ROW_PREBUILT_FETCH_MAGIC_N) e ele persiste mesmo com
+  innodb_force_recovery=2 e OPTIMIZE completo, reinstalar o MariaDB com a
+  equipe de serviços é uma opção: dump em manutenção (porta trocada),
+  reinstalar (de preferência o último 10.4.x), restaurar e conferir.
+  Lista logo depois do RESUMO. O DiagBIG cruza tela azul, memória, disco,
+  energia e banco e lista as causas possíveis. Qualquer uma pode ser a
+  origem e nenhuma vem confirmada (ex.: "Possível causa: RAM defeituosa ...
+  testar ANTES de restaurar o banco"). É indício, não prova. Banco em loop de crash
+  (cai e reinicia sozinho) também é avisado aqui.
+
 BANCO (nome do serviço)
   Vale para MariaDB, MySQL 5.x/8 e MySQL 4 (em C:\mysql, log data\mysql.err).
   Erros do arquivo .err do MySQL/MariaDB: tabela "marked as crashed",
   página corrompida, disco cheio, crash do banco etc.
   O relatório mostra qual .err foi lido e como ele foi achado.
+
+  AVISOS DO my.ini (aparecem como AVISO no bloco do banco e em CAUSAS PROVÁVEIS):
+    - innodb_doublewrite=OFF: sem proteção contra página gravada pela metade.
+      Queda de energia, tela azul, RAM/disco com defeito ou crash do banco
+      pode corromper o InnoDB sem reparo. Tirar a linha (padrão é ON).
+    - innodb_flush_log_at_trx_commit=0 ou 2: perde até ~1 s de transações
+      confirmadas numa queda de energia/tela azul. Usar 1 sem no-break.
+    - innodb_force_recovery maior que 0 ATIVO: banco em modo de recuperação,
+      bloqueia INSERT/UPDATE/DELETE (4 ou mais pode danificar os dados de vez).
+      Só usar para MANUTENÇÃO (tirar o dump) e com a PORTA do banco trocada,
+      para o sistema do cliente não conectar nele. Depois: remover a linha,
+      voltar a porta, recriar o banco e restaurar.
 
 EVENTOS DO BANCO NO WINDOWS
   Banco que travou (Application Error 1000) ou serviço do banco que parou

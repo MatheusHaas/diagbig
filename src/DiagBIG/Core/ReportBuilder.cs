@@ -200,6 +200,18 @@ namespace DiagBIG.Core
             return sb.ToString();
         }
 
+        public static string BuildHypotheses(ReportData d)
+        {
+            var sb = new StringBuilder();
+            Title(sb, "CAUSAS PROVÁVEIS (ANÁLISE AUTOMÁTICA, INDÍCIO NÃO É PROVA)");
+            if (d.Hypotheses.Count == 0) sb.Append("  Nenhum indício forte de causa nos logs lidos.").Append(NL);
+            else sb.Append("  Qualquer uma das causas abaixo pode ser a origem; nenhuma está confirmada. Descartar uma por vez.").Append(NL);
+            int n = 0;
+            foreach (string h in d.Hypotheses) sb.Append("  ").Append(++n).Append(". ").Append(h).Append(NL);
+            sb.Append(NL);
+            return sb.ToString();
+        }
+
         public static string BuildSections(ReportData d)
         {
             var sb = new StringBuilder();
@@ -220,6 +232,7 @@ namespace DiagBIG.Core
             if (!string.IsNullOrEmpty(b.Title))
                 sb.Append(">>> ").Append(b.Title.ToUpperInvariant()).Append(NL);
             foreach (string i in b.Info) sb.Append(i).Append(NL);
+            foreach (string w in b.Warnings) sb.Append("AVISO: ").Append(w).Append(NL);
 
             if (!b.Verified)
             {
@@ -272,13 +285,13 @@ namespace DiagBIG.Core
 
         public static string BuildFull(ReportData d)
         {
-            return BuildHeader(d) + BuildSummary(d) + BuildSections(d);
+            return BuildHeader(d) + BuildSummary(d) + BuildHypotheses(d) + BuildSections(d);
         }
 
         /// <summary>Cabeçalho + resumo, cortado em no máximo maxChars (para colar no caso).</summary>
         public static string BuildResumo(ReportData d, int maxChars = Config.ResumoMaxChars)
         {
-            return Truncate((BuildHeader(d) + BuildSummary(d)).TrimEnd() + NL, maxChars);
+            return Truncate((BuildHeader(d) + BuildSummary(d) + BuildHypotheses(d)).TrimEnd() + NL, maxChars);
         }
 
         public static string Truncate(string text, int maxChars)

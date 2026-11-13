@@ -56,7 +56,11 @@ namespace DiagBIG.Core
         public static string KernelPower41Cause(long bugcheckCode, long powerButtonTimestamp, bool sleepInProgress)
         {
             if (bugcheckCode != 0)
-                return "TELA AZUL (BugcheckCode 0x" + bugcheckCode.ToString("X", CultureInfo.InvariantCulture) + ")";
+            {
+                string desc = Bugchecks.Describe(bugcheckCode);
+                return "TELA AZUL (BugcheckCode 0x" + bugcheckCode.ToString("X", CultureInfo.InvariantCulture) + ")" +
+                       (desc.Length > 0 ? " " + desc : "");
+            }
             if (powerButtonTimestamp != 0)
                 return "BOTÃO DE ENERGIA pressionado/segurado para forçar o desligamento";
             if (sleepInProgress)
@@ -88,6 +92,12 @@ namespace DiagBIG.Core
                 case PowerKind.Sleep:
                 case PowerKind.Wake:
                     return "";
+                case PowerKind.BlueScreen:
+                    {
+                        long? code = Bugchecks.FromOccurrence(new Occurrence { Source = "Microsoft-Windows-WER-SystemErrorReporting", EventId = "1001", Message = message });
+                        string desc = code == null ? "" : Bugchecks.Describe(code.Value);
+                        return (desc.Length > 0 ? "0x" + code.Value.ToString("X", CultureInfo.InvariantCulture) + " " + desc + " | " : "") + ReportBuilder.OneLine(message, 220);
+                    }
                 default:
                     return ReportBuilder.OneLine(message, 220);
             }
