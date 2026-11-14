@@ -151,6 +151,76 @@ namespace DiagBIG.Tests
                                     x.Contains("force_recovery=2") && x.Contains("OPTIMIZE completo"));
         }
 
+        /// <summary>Caso real (SERVER-CENTRAL): InnoDB não sobe por página corrompida, 41 tentativas.</summary>
+        [Fact]
+        public void InnodbStartupFailure_TopCauseWithTablesAndRecovery()
+        {
+            var lines = new List<Occurrence>();
+            for (int i = 0; i < 6; i++)
+            {
+                lines.Add(Ev(".err", 0, "[ERROR] InnoDB: Failed to read file '.\\gerente\\comunicacao_fila_filial_028.ibd' at offset 151: Page read from tablespace is corrupted.", "[ERROR]"));
+                lines.Add(Ev(".err", 0, "[ERROR] InnoDB: Database page corruption on disk or a failed file read of tablespace gerente/comunicacao_fila_filial_009 page [page id: space=#]", "corruption"));
+                lines.Add(Ev(".err", 0, "[ERROR] Plugin 'InnoDB' init function returned error.", "[ERROR]"));
+                lines.Add(Ev(".err", 0, "[ERROR] Unknown/unsupported storage engine: InnoDB", "[ERROR]"));
+                lines.Add(Ev(".err", 0, "[ERROR] Aborting", "Aborting"));
+            }
+            var power = Block(BlockTag.Power, true, Ev("EventLog", 6008, "O desligamento não era esperado"));
+            List<string> h = Hypotheses.Analyze(Data(Block(BlockTag.Db, false, lines.ToArray()), power));
+            Assert.StartsWith("BANCO NÃO SOBE", h[0]);
+            Assert.Contains("6 tentativa(s)", h[0]);
+            Assert.Contains("LOOP", h[0]);
+            Assert.Contains("gerente.comunicacao_fila_filial_009", h[0]);
+            Assert.Contains("gerente.comunicacao_fila_filial_028", h[0]);
+            Assert.Contains("innodb_force_recovery=1", h[0]);
+            Assert.Contains("copiar a pasta data ANTES", h[0]);
+            Assert.Equal(6, Hypotheses.StartupFailures(lines, null));
+        }
+
+        [Fact]
+        public void NoStartupFailure_NoBancoNaoSobe()
+        {
+            var db = Block(BlockTag.Db, false, Ev(".err", 0, "[ERROR] Table './x/y' is marked as crashed", "marked as crashed"));
+            Assert.DoesNotContain(Hypotheses.Analyze(Data(db)), x => x.StartsWith("BANCO NÃO SOBE"));
+        }
+
+        [Fact]
+        public void OsSection_ServerEvaluation_ShowsOnlyServerFields()
+        {
+            var os = new OsInfo { ProductName = "Windows Server 2019 Datacenter Evaluation", InstallationType = "Server", ProductType = 3, DomainRole = 3, FastStartup = true, PendingRebootChecked = true };
+            os.PendingReboot.Add("Windows Update");
+            string text = string.Join("\n", OsRules.Lines(os, new DateTime(2026, 11, 13)).ToArray());
+            Assert.Contains("servidor membro de domínio", text);
+            Assert.Contains("INSTALAÇÃO", text);
+            Assert.Contains("atualizações de segurança até 09/01/2029", text);
+            Assert.Contains("AVALIAÇÃO", text);
+            Assert.Contains("SIM (Windows Update)", text);
+            Assert.DoesNotContain("INIC. RÁPIDA", text);
+        }
+
+        [Fact]
+        public void OsSection_Workstation_ShowsFastStartupAndEndOfSupport()
+        {
+            var os = new OsInfo { ProductName = "Windows 7 Professional", ProductType = 1, FastStartup = true, PendingRebootChecked = true };
+            string text = string.Join("\n", OsRules.Lines(os, new DateTime(2026, 11, 13)).ToArray());
+            Assert.Contains("estação de trabalho", text);
+            Assert.Contains("sem atualizações de segurança desde 14/01/2020", text);
+            Assert.Contains("INIC. RÁPIDA", text);
+            Assert.DoesNotContain("INSTALAÇÃO", text);
+            Assert.DoesNotContain("AVALIAÇÃO", text);
+            Assert.Contains("REINÍCIO PEND.", text);
+            Assert.Null(OsRules.SupportEnd("Windows 10 Enterprise LTSC 2019"));
+        }
+
+        [Fact]
+        public void EvaluationServer_WithUnexpectedShutdown_HasCause()
+        {
+            var d = Data(Block(BlockTag.Power, true, Kp41(0x0)));
+            d.Os = new OsInfo { ProductName = "Windows Server 2019 Datacenter Evaluation", ProductType = 3 };
+            Assert.Contains(Hypotheses.Analyze(d), x => x.StartsWith("Windows Server em edição de AVALIAÇÃO"));
+            d.Os = new OsInfo { ProductName = "Windows Server 2019 Standard", ProductType = 3 };
+            Assert.DoesNotContain(Hypotheses.Analyze(d), x => x.Contains("AVALIAÇÃO"));
+        }
+
         [Fact]
         public void NoMemoryError_NoReinstallProcedure()
         {

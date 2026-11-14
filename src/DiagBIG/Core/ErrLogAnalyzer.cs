@@ -29,6 +29,10 @@ namespace DiagBIG.Core
         static readonly Regex LeadingThreadId = new Regex(@"^\s*\d+\s+(?=\[)", RegexOptions.Compiled);
         static readonly Regex Hex = new Regex(@"0x[0-9a-fA-F]+", RegexOptions.Compiled);
         static readonly Regex LongNumber = new Regex(@"\d{4,}", RegexOptions.Compiled);
+        // Data de uma linha de log no meio de lixo binário (o InnoDB despeja a página corrompida sem quebra de linha).
+        static readonly Regex EmbeddedLogLine = new Regex(
+            @"\d{4}-\d{2}-\d{2}[ T]\s*\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\s+\d+\s+\[(?:ERROR|FATAL|Warning|Note|System)\]", RegexOptions.Compiled);
+        static readonly Regex HexDump = new Regex(@"\blen \d+; hex [0-9a-fA-F]{8,}", RegexOptions.Compiled);
         static readonly Regex Spaces = new Regex(@"\s+", RegexOptions.Compiled);
 
         /// <summary>Data/hora no começo da linha (hora local), ou null.</summary>
@@ -109,6 +113,26 @@ namespace DiagBIG.Core
             return s;
         }
 
+        /// <summary>
+        /// Limpa o lixo binário de uma linha do .err: tira caracteres de controle, descarta despejo hexadecimal
+        /// ("len 12; hex ...") e, se uma linha de log real veio colada depois do lixo, fica só com ela.
+        /// </summary>
+        public static string CleanLine(string line)
+        {
+            if (string.IsNullOrEmpty(line)) return line ?? "";
+            var sb = new StringBuilder(line.Length);
+            foreach (char c in line)
+                if (c == '\t' || (c >= ' ' && c != '\uFFFD')) sb.Append(c);
+            string s = sb.ToString();
+            if (HexDump.IsMatch(s)) return "";
+            if (!char.IsDigit(s.Length > 0 ? s[0] : ' ') || TryParseLineDate(s) == null)
+            {
+                Match m = EmbeddedLogLine.Match(s);
+                if (m.Success && m.Index > 0) s = s.Substring(m.Index);
+            }
+            return s;
+        }
+
         public static ErrAnalysis Analyze(string text, DateTime since)
         {
             return Analyze(text, since, Config.ErrPatterns, Config.CrashPatterns, Config.CrashContextLines);
@@ -119,6 +143,7 @@ namespace DiagBIG.Core
             var result = new ErrAnalysis();
             string[] lines = (text ?? "").Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
             result.LineCount = lines.Length;
+            for (int i = 0; i < lines.Length; i++) lines[i] = CleanLine(lines[i]);
 
             // Data de cada linha; sem data herda a da anterior.
             var dates = new DateTime?[lines.Length];
@@ -144,6 +169,7 @@ namespace DiagBIG.Core
                 string line = lines[i];
                 if (line.Trim().Length == 0) continue;
                 if (i <= contextUntil && !ownDate[i]) continue;
+                if (ContainsAny(line, Config.ErrIgnore)) continue;
                 string pattern = MatchPattern(line, patterns);
                 if (pattern == null) continue;
 

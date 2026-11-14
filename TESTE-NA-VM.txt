@@ -128,6 +128,14 @@ Amostras (pasta amostras\)
 - my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.
 
 
+N) Novidades da 1.5.4 (conferir na VM)
+   - Cabeçalho: nova sessão "SISTEMA OPERACIONAL" depois de IDENTIFICAÇÃO. Em Windows cliente: TIPO estação de trabalho, EDIÇÃO,
+     SUPORTE, REINÍCIO PEND. (e INIC. RÁPIDA se ligada). Em Windows Server: TIPO servidor, INSTALAÇÃO, sem INIC. RÁPIDA.
+     Em edição Evaluation: linha LICENÇA com AVISO.
+   - Banco que não sobe: com um .err contendo "Plugin 'InnoDB' init function returned error" (várias vezes) deve aparecer
+     "BANCO NÃO SOBE" no topo de CAUSAS PROVÁVEIS e na linha BANCO do RESUMO, com as tabelas e o passo a passo.
+   - .err com lixo binário/hex ("len 12; hex ...") não deve mais gerar centenas de grupos.
+
 N) Novidades da 1.5.3 (conferir na VM)
    - Write-EventLog -LogName System -Source Ntfs -EventId 55 -EntryType Error -Message "estrutura corrompida": em CAUSAS PROVÁVEIS deve
      aparecer "Sistema de arquivos corrompido (Ntfs 55 ...)" com backup, chkdsk /scan e /f.

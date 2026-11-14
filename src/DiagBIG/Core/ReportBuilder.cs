@@ -141,6 +141,14 @@ namespace DiagBIG.Core
                 sb.Append("  ARQUIVO .......: ").Append(d.OutputFileName).Append(NL);
             sb.Append(NL);
 
+            var osLines = OsRules.Lines(d.Os, d.CollectedAt);
+            if (osLines.Count > 0)
+            {
+                Title(sb, "SISTEMA OPERACIONAL");
+                foreach (string ol in osLines) sb.Append(ol).Append(NL);
+                sb.Append(NL);
+            }
+
             Title(sb, "UNIDADES");
             if (d.DrivesError != null) sb.Append("  NÃO VERIFICADO: ").Append(d.DrivesError).Append(NL);
             foreach (string dr in d.Drives) sb.Append("  ").Append(dr).Append(NL);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace DiagBIG.Core
 {
@@ -28,6 +29,34 @@ namespace DiagBIG.Core
             if (o == null) return false;
             if (string.Equals(Grouping.ShortSource(o.Source), "disk", StringComparison.OrdinalIgnoreCase) && o.EventId == "7") return true;
             return ContainsAny(o.Message, null, BadSectorTerms);
+        }
+
+        static readonly string[] StartupFailureTerms = { "init function returned error", "Unknown/unsupported storage engine" };
+        static readonly Regex CorruptFileRx = new Regex(@"'(?:[^']*[\\/])?([^\\/']+)[\\/]([^\\/']+)\.ibd'", RegexOptions.Compiled);
+        static readonly Regex CorruptSpaceRx = new Regex(@"tablespace\s+([\w$]+)/([\w$#]+)", RegexOptions.Compiled);
+
+        /// <summary>Tentativas de subir o banco que falharam (InnoDB aborta na inicialização), do .err e dos eventos do Windows.</summary>
+        public static int StartupFailures(IEnumerable<Occurrence> errLines, IEnumerable<Occurrence> events)
+        {
+            Func<IEnumerable<Occurrence>, int> count = os => os == null ? 0 :
+                os.Count(o => ContainsAny(o.Message, null, new[] { StartupFailureTerms[0] }));
+            Func<IEnumerable<Occurrence>, int> countEngine = os => os == null ? 0 :
+                os.Count(o => ContainsAny(o.Message, null, new[] { StartupFailureTerms[1] }));
+            return new[] { count(errLines), countEngine(errLines), count(events), countEngine(events) }.Max();
+        }
+
+        /// <summary>Tabelas (banco.tabela) com página corrompida citadas no .err e nos eventos.</summary>
+        public static List<string> CorruptTables(IEnumerable<Occurrence> lines)
+        {
+            var set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Occurrence o in lines)
+            {
+                string msg = o.Message ?? "";
+                if (msg.IndexOf("corrupt", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                foreach (Match m in CorruptFileRx.Matches(msg)) set.Add(m.Groups[1].Value + "." + m.Groups[2].Value);
+                foreach (Match m in CorruptSpaceRx.Matches(msg)) set.Add(m.Groups[1].Value + "." + m.Groups[2].Value);
+            }
+            return set.ToList();
         }
 
         static IEnumerable<ReportBlock> Blocks(ReportData d, string tag)
@@ -146,6 +175,12 @@ namespace DiagBIG.Core
                 result.Add("Tela azul típica de driver (" + string.Join(", ", infos.Where(i => i.Suspect == BugcheckSuspect.Driver).Select(i => i.Name).Distinct().ToArray()) +
                            "): abrir o C:\\Windows\\MEMORY.DMP no BlueScreenView/WinDbg para ver qual driver causou.");
 
+            // 3b) Windows Server em avaliação com desligamentos inesperados
+            if (OsRules.IsEvaluation(d.Os) && OsRules.IsServer(d.Os) &&
+                Occ(d, BlockTag.Power).Any(o => PowerEvents.IsUnexpected(PowerEvents.Classify(o.Source, o.EventId))))
+                result.Add("Windows Server em edição de AVALIAÇÃO com desligamentos inesperados: se o prazo da avaliação expirou, o Windows desliga sozinho de hora em hora " +
+                           "(e derruba o banco). Conferir com \"slmgr /xpr\"; se expirou, ativar com licença definitiva.");
+
             // 4) energia
             if (powerLoss > 0)
                 result.Add("Desligamento sem tela azul e sem botão (" + powerLoss + "x): provável queda de energia, fonte ou no-break. Verificar a energia/no-break; queda de energia corrompe banco.");
@@ -159,6 +194,22 @@ namespace DiagBIG.Core
             if (dbCrashes >= Config.CrashLoopThreshold)
                 result.Add("Banco em LOOP DE CRASH (" + dbCrashes + " quedas no período): o serviço cai e reinicia sozinho. " +
                            "Parar o serviço, tirar cópia da pasta data e só então recuperar (innodb_force_recovery + dump, ou backup). Não deixar o sistema gravando nele.");
+
+            // 5a) banco que não sobe: InnoDB aborta na inicialização (vai para o topo da lista)
+            var dbAll = dbLines.Concat(Occ(d, BlockTag.DbEvents)).ToList();
+            int startupFails = StartupFailures(dbLines, Occ(d, BlockTag.DbEvents));
+            if (startupFails > 0)
+            {
+                List<string> tables = CorruptTables(dbAll);
+                string loop = startupFails >= Config.CrashLoopThreshold ? ", em LOOP: o serviço tenta subir e cai sem parar" : "";
+                string tabs = tables.Count == 0 ? "" :
+                    " Tabelas com página corrompida: " + string.Join(", ", tables.Take(10).ToArray()) + (tables.Count > 10 ? " e mais " + (tables.Count - 10) : "") + ".";
+                result.Insert(0, "BANCO NÃO SOBE: o InnoDB aborta na inicialização (" + startupFails + " tentativa(s) falhou" + loop + ")." + tabs +
+                                 " Procedimento: parar o serviço e copiar a pasta data ANTES de mexer; no my.ini, em [mysqld], pôr innodb_force_recovery=1 e subir o serviço " +
+                                 "(se não subir, aumentar de 1 em 1, até 3; 4 ou mais pode perder dados); com o banco no ar, tirar o dump, parar, remover a opção e restaurar do dump ou do backup. " +
+                                 (tables.Count > 0 ? "Conferir se as tabelas corrompidas são de dados importantes ou recriáveis (ex.: fila/temporárias); as recriáveis podem ser descartadas e recriadas. " : "") +
+                                 "Não deixar o sistema gravando no banco durante o procedimento. A causa da corrupção (energia, RAM, disco) precisa ser tratada, senão volta.");
+            }
 
             // 5b) erro de memória no banco: procedimento de reinstalação
             if (dbLines.Any(o => ContainsAny(o.Message, o.SummaryKey, DbMemoryErrorTerms)))

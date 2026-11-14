@@ -26,6 +26,8 @@ namespace DiagBIG.Tests
         [InlineData("Windows Server")]
         [InlineData("DiagBIG_relatorios")]
         [InlineData("--sem-janela")]
+        [InlineData("SISTEMA OPERACIONAL")]
+        [InlineData("BANCO NÃO SOBE")]
         public void ManualMentions(string term)
         {
             string manual = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "docs", "MANUAL.txt"));

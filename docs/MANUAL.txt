@@ -58,6 +58,21 @@ DISCO
   HP Smart Array, LSI, Adaptec). Com ATENÇÃO: suspeitar do disco e
   encaminhar ao N2.
 
+SISTEMA OPERACIONAL (no cabeçalho, depois de IDENTIFICAÇÃO)
+  O DiagBIG detecta se é Windows Server ou Windows cliente (7 ao 11) e
+  mostra só os campos que valem para o tipo:
+  - TIPO e EDIÇÃO: servidor (membro de domínio, controlador de domínio ou
+    independente) ou estação de trabalho.
+  - INSTALAÇÃO (só servidor): com interface gráfica ou Server Core.
+  - SUPORTE: fim das atualizações de segurança da versão. AVISO se já
+    acabou (ex.: Windows 7, Server 2008/2012, Windows 10 após 14/10/2025).
+  - LICENÇA: AVISO se for edição de AVALIAÇÃO (Evaluation). Passado o
+    prazo, o Windows desliga sozinho de hora em hora e derruba o banco.
+    Conferir com "slmgr /xpr"; em produção, licença definitiva.
+  - REINÍCIO PEND.: SIM se há atualização/instalação esperando reinício.
+  - INIC. RÁPIDA (só Windows cliente): ligada = "Desligar" não reinicia o
+    Windows por completo; só "Reiniciar" reinicia.
+
 RAID (no cabeçalho, em IDENTIFICAÇÃO)
   SIM = o PC/servidor tem controladora RAID (mostra qual).
   NÃO = discos ligados direto (mostra as controladoras vistas).
@@ -103,6 +118,10 @@ MEMÓRIA/HARDWARE
   MemTest86 quando houver tela azul 0x1A/0x50/0x4E ou banco corrompido.
 
 CAUSAS PROVÁVEIS
+  BANCO NÃO SOBE (fica no topo): o InnoDB aborta na inicialização, em geral
+  por página corrompida. Mostra as tabelas afetadas e o passo a passo:
+  copiar a pasta data, innodb_force_recovery=1 (subir de 1 em 1 até 3),
+  dump e restauração.
   PROCEDIMENTO de reinstalação: quando o .err mostra erro de memória do banco
   (ex.: assertion ROW_PREBUILT_FETCH_MAGIC_N) e ele persiste mesmo com
   innodb_force_recovery=2 e OPTIMIZE completo, reinstalar o MariaDB com a

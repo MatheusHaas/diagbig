@@ -88,6 +88,8 @@ namespace DiagBIG.Core
     {
         public string ComputerName { get; set; }
         public string WindowsVersion { get; set; }
+        /// <summary>Dados do sistema operacional para a sessão SISTEMA OPERACIONAL (null = não lido).</summary>
+        public OsInfo Os { get; set; }
         public DateTime CollectedAt { get; set; }
         public int PeriodDays { get; set; }
         public DateTime Since { get; set; }

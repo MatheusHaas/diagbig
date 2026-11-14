@@ -39,6 +39,54 @@ namespace DiagBIG.Windows
             }
         }
 
+        /// <summary>Dados do SO (tipo, edição, reinício pendente, inicialização rápida). Cada campo falha sozinho, sem lançar exceção.</summary>
+        public static OsInfo ReadOs()
+        {
+            var o = new OsInfo();
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion", false))
+                {
+                    o.ProductName = k.GetValue("ProductName") as string;
+                    o.EditionId = k.GetValue("EditionID") as string;
+                    o.InstallationType = k.GetValue("InstallationType") as string;
+                }
+            }
+            catch (Exception) { }
+            try
+            {
+                using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT ProductType FROM Win32_OperatingSystem", Options()))
+                    foreach (ManagementObject mo in s.Get())
+                        using (mo) { if (mo["ProductType"] != null) o.ProductType = Convert.ToInt32(mo["ProductType"], CultureInfo.InvariantCulture); }
+            }
+            catch (Exception) { }
+            try
+            {
+                using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT DomainRole FROM Win32_ComputerSystem", Options()))
+                    foreach (ManagementObject mo in s.Get())
+                        using (mo) { if (mo["DomainRole"] != null) o.DomainRole = Convert.ToInt32(mo["DomainRole"], CultureInfo.InvariantCulture); }
+            }
+            catch (Exception) { }
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending", false))
+                    if (k != null) o.PendingReboot.Add("manutenção do Windows");
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired", false))
+                    if (k != null) o.PendingReboot.Add("Windows Update");
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager", false))
+                    if (k != null && k.GetValue("PendingFileRenameOperations") != null) o.PendingReboot.Add("arquivos a substituir");
+                o.PendingRebootChecked = true;
+            }
+            catch (Exception) { }
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Power", false))
+                    if (k != null && k.GetValue("HiberbootEnabled") is int) o.FastStartup = (int)k.GetValue("HiberbootEnabled") == 1;
+            }
+            catch (Exception) { }
+            return o;
+        }
+
         /// <summary>Último boot completo (Win32_OperatingSystem.LastBootUpTime).</summary>
         public static DateTime? LastBoot()
         {

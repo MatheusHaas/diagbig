@@ -42,6 +42,27 @@ namespace DiagBIG.Tests
 
     public class ErrAnalyzerTests
     {
+        /// <summary>Caso real (SERVER-CENTRAL): InnoDB despeja a página corrompida colada nas linhas de log.</summary>
+        [Fact]
+        public void BinaryGarbage_IsCleanedAndBoilerplateIgnored()
+        {
+            string err =
+                "2026-11-13 19:18:38 0 [ERROR] InnoDB: Database page corruption on disk or a failed file read of tablespace gerente/comunicacao_fila_filial_028 page [page id: space=1972, page number=4]\r\n" +
+                "2026-11-13 19:18:38 0 [Note] InnoDB: It is also possible that your operating system has corrupted its own file cache and rebooting your computer removes the error.\r\n" +
+                "(a) len 12; hex 2d00d45de71faac45bf0dcf0b5f80aa0bd45a7de721e; asc -   E\r\n" +
+                "estoque_minimo\0\0produto_id=5 and filial_id=24 \0$ ! Z N 2026-11-13 19:18:38 0 [ERROR] InnoDB: Failed to read file '.\\gerente\\comunicacao_fila_filial_028.ibd' at offset 151: Page read from tablespace is corrupted.\r\n" +
+                "2026-11-13 19:18:39 0 [ERROR] InnoDB: Failed to read file '.\\gerente\\comunicacao_fila_filial_028.ibd' at offset 151: Page read from tablespace is corrupted.\r\n";
+            var a = ErrLogAnalyzer.Analyze(err, new DateTime(2026, 11, 1));
+            Assert.DoesNotContain(a.Occurrences, o => o.Message.Contains("It is also possible"));
+            Assert.DoesNotContain(a.Occurrences, o => o.Message.Contains("hex "));
+            // A linha colada no lixo vira a mesma ocorrência da linha limpa (mesmo grupo).
+            var fail = a.Occurrences.Where(o => o.Message.Contains("Failed to read file")).ToList();
+            Assert.Equal(2, fail.Count);
+            Assert.Single(fail.Select(o => o.GroupKey).Distinct());
+            Assert.StartsWith("2026-11-13 19:18:38", fail[0].Message);
+            Assert.Equal(new DateTime(2026, 11, 13, 19, 18, 38), fail[0].Time);
+        }
+
         [Fact]
         public void Mysql51Sample_CrashWithContext_UndatedInheritsDate()
         {

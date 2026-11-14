@@ -39,6 +39,7 @@ namespace DiagBIG.Windows
 
             progress("Lendo informações do sistema...");
             d.WindowsVersion = SystemInfo.WindowsVersion();
+            try { d.Os = SystemInfo.ReadOs(); } catch (Exception) { }
             try { d.Drives.AddRange(SystemInfo.FixedDrives()); }
             catch (Exception ex) { d.DrivesError = ex.Message; }
 
@@ -278,6 +279,9 @@ namespace DiagBIG.Windows
                 if (notes.Count > 0)
                     b.SummaryNote = string.Join("; ", (b.SummaryNote != null ? new[] { b.SummaryNote } : new string[0]).Concat(notes).ToArray());
                 b.Occurrences.AddRange(an.Occurrences);
+                int startupFails = Hypotheses.StartupFailures(an.Occurrences, null);
+                if (startupFails > 0)
+                    b.SummaryNote = string.Join("; ", (b.SummaryNote != null ? new[] { b.SummaryNote } : new string[0]).Concat(new[] { "BANCO NÃO SOBE (InnoDB aborta na inicialização, " + startupFails + "x)" }).ToArray());
             }
             catch (Exception ex)
             {
