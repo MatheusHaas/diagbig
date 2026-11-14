@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.5.4";
+        public const string Version = "1.6.0";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -105,6 +105,7 @@ namespace DiagBIG.Core
             "Got error 1", // pega "Got error 1", 126, 127, 134, 145...
             "Operating system error", "Out of memory", "Aborting", "crash recovery",
             "Can't open", "Unable to lock", "No space left", "Disk full",
+            "is in the future", "doesn't exist in engine", "Address already in use", "Access is denied",
         };
 
         /// <summary>Linhas com estes textos são ignoradas: aviso padrão que o InnoDB repete após cada erro de página (só infla a contagem).</summary>

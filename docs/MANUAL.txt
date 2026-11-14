@@ -117,6 +117,26 @@ MEMÓRIA/HARDWARE
   Se o teste de memória nunca rodou, o log não tem nada: rode mdsched.exe ou
   MemTest86 quando houver tela azul 0x1A/0x50/0x4E ou banco corrompido.
 
+ONDE ESTÁ O PROBLEMA
+  Vem logo depois do RESUMO, antes das CAUSAS PROVÁVEIS. Separa em áreas, cada
+  uma com veredito PROVÁVEL, POSSÍVEL ou sem indício, a evidência e o que fazer.
+  A primeira linha dá o encaminhamento mais provável.
+  - TABELA(S) ESPECÍFICA(S): lista banco.tabela com erro. Se só há tabelas,
+    não precisa reinstalar: MyISAM REPAIR TABLE; InnoDB dump, recriar, restaurar.
+  - ARQUIVOS DO BANCO (ibdata1, redo log, dicionário): não é tabela, REPAIR e
+    OPTIMIZE não resolvem. Dump com innodb_force_recovery, reinstalar, restaurar.
+  - MOTOR DO BANCO: erro de memória (MAGIC_N, signal 11) ou queda sem corrupção
+    de tabela: reinstalar com dump/restore ou atualizar a versão.
+  - ESPAÇO, E/S E ACESSO: disco cheio, erro de leitura/gravação (hardware) ou
+    arquivo bloqueado (antivírus/backup na pasta data).
+  - HARDWARE (RAM, DISCO, ENERGIA): testar/trocar ANTES de restaurar, senão o
+    banco corrompe de novo. Se há tabela corrompida e hardware ruim, o
+    hardware vem primeiro.
+  - WINDOWS (avaliação): Server Evaluation vencido desliga de hora em hora.
+  - SERVIÇO, INSTALAÇÃO E my.ini: porta em uso, engine ausente, falha do serviço.
+  Só enxerga o que está nos logs: não prova a causa. Para confirmar, rodar
+  CHECK TABLE e testar RAM e disco.
+
 CAUSAS PROVÁVEIS
   BANCO NÃO SOBE (fica no topo): o InnoDB aborta na inicialização, em geral
   por página corrompida. Mostra as tabelas afetadas e o passo a passo:

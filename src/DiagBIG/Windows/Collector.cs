@@ -228,6 +228,7 @@ namespace DiagBIG.Windows
 
             progress("Montando relatório...");
             try { d.Hypotheses.AddRange(Hypotheses.Analyze(d)); } catch (Exception) { }
+            try { d.Diagnosis.AddRange(Diagnosis.Analyze(d)); } catch (Exception) { }
             var r = new CollectionResult { Data = d };
             r.FullText = ReportBuilder.BuildFull(d);
             r.ResumoText = ReportBuilder.BuildResumo(d);

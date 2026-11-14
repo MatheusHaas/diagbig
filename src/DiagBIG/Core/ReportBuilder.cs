@@ -208,6 +208,28 @@ namespace DiagBIG.Core
             return sb.ToString();
         }
 
+        static string VerdictText(DiagVerdict v)
+        {
+            return v == DiagVerdict.Provavel ? "PROVÁVEL" : v == DiagVerdict.Possivel ? "POSSÍVEL" : "sem indício";
+        }
+
+        public static string BuildDiagnosis(ReportData d)
+        {
+            var sb = new StringBuilder();
+            if (d.Diagnosis.Count == 0) return "";
+            Title(sb, "ONDE ESTÁ O PROBLEMA (SÓ O QUE OS LOGS MOSTRAM)");
+            string bottom = Diagnosis.Bottom(d.Diagnosis);
+            if (bottom != null) sb.Append("  Encaminhamento mais provável: ").Append(bottom).Append(NL).Append(NL);
+            foreach (DiagItem it in d.Diagnosis)
+            {
+                sb.Append("  [").Append(VerdictText(it.Verdict)).Append("] ").Append(it.Area).Append(NL);
+                sb.Append("      ").Append(it.Evidence).Append(NL);
+                if (it.Verdict != DiagVerdict.SemIndicio && !string.IsNullOrEmpty(it.Action)) sb.Append("      O que fazer: ").Append(it.Action).Append(NL);
+            }
+            sb.Append(NL);
+            return sb.ToString();
+        }
+
         public static string BuildHypotheses(ReportData d)
         {
             var sb = new StringBuilder();
@@ -293,13 +315,13 @@ namespace DiagBIG.Core
 
         public static string BuildFull(ReportData d)
         {
-            return BuildHeader(d) + BuildSummary(d) + BuildHypotheses(d) + BuildSections(d);
+            return BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildHypotheses(d) + BuildSections(d);
         }
 
         /// <summary>Cabeçalho + resumo, cortado em no máximo maxChars (para colar no caso).</summary>
         public static string BuildResumo(ReportData d, int maxChars = Config.ResumoMaxChars)
         {
-            return Truncate((BuildHeader(d) + BuildSummary(d) + BuildHypotheses(d)).TrimEnd() + NL, maxChars);
+            return Truncate((BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildHypotheses(d)).TrimEnd() + NL, maxChars);
         }
 
         public static string Truncate(string text, int maxChars)

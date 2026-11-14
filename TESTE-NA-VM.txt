@@ -128,6 +128,15 @@ Amostras (pasta amostras\)
 - my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.
 
 
+N) Novidades da 1.6.0 (conferir na VM)
+   - Depois do RESUMO deve aparecer "ONDE ESTÁ O PROBLEMA" (some se não há nada de banco/hardware), com "Encaminhamento mais provável".
+   - .err só com "Table '.\\loja\\movimento' is marked as crashed": TABELA(S) ESPECÍFICA(S) = PROVÁVEL, loja.movimento listada, ARQUIVOS = sem indício.
+   - Somar Write-EventLog -Source disk -EventId 7 -EntryType Error -Message "bloco inválido": HARDWARE = PROVÁVEL e o encaminhamento
+     passa a mandar tratar o hardware antes; a ação da tabela cita "hardware abaixo".
+   - .err com "Plugin 'InnoDB' init function returned error" sem nome de tabela: ARQUIVOS DO BANCO = POSSÍVEL.
+   - .err com "Disk full ... errno: 28": ESPAÇO, E/S E ACESSO = PROVÁVEL. Em Server Evaluation com 6008: WINDOWS = PROVÁVEL.
+   - Copiar amostras\mariadb104_corrupcao.err como log do banco e conferir loja.clientes e loja.movimento citadas.
+
 N) Novidades da 1.5.4 (conferir na VM)
    - Cabeçalho: nova sessão "SISTEMA OPERACIONAL" depois de IDENTIFICAÇÃO. Em Windows cliente: TIPO estação de trabalho, EDIÇÃO,
      SUPORTE, REINÍCIO PEND. (e INIC. RÁPIDA se ligada). Em Windows Server: TIPO servidor, INSTALAÇÃO, sem INIC. RÁPIDA.

@@ -109,6 +109,8 @@ namespace DiagBIG.Core
         public List<SummaryItem> Summary { get; } = new List<SummaryItem>();
         /// <summary>Causas prováveis (calculadas por Hypotheses a partir dos blocos).</summary>
         public List<string> Hypotheses { get; } = new List<string>();
+        /// <summary>Onde está o problema (calculado por Diagnosis).</summary>
+        public List<DiagItem> Diagnosis { get; } = new List<DiagItem>();
         public List<ReportSection> Sections { get; } = new List<ReportSection>();
     }
 }
