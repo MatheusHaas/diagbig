@@ -7,6 +7,11 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+set LOG=%~dp0simulador-log.txt
+echo ==== %date% %time% ==== >> "%LOG%"
+ver >> "%LOG%"
+whoami >> "%LOG%"
+echo pasta: %~dp0 >> "%LOG%"
 set PS=powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0simular.ps1"
 set DIAG=%~dp0..\DiagBIG.exe
 if not exist "%DIAG%" set DIAG=%~dp0DiagBIG.exe
@@ -31,12 +36,17 @@ echo   0 - Sair
 set /p op=Escolha: 
 if /i "%op%"=="0" exit /b 0
 if /i "%op%"=="C" goto coletar
-%PS% -Cenario %op%
+echo opcao %op% >> "%LOG%"
+%PS% -Cenario %op% >> "%LOG%" 2>&1
+echo (erro level %errorlevel%) >> "%LOG%"
+powershell -NoProfile -Command "Get-Content '%LOG%' -Tail 8"
 goto menu
 
 :coletar
 if not exist "%DIAG%" (echo DiagBIG.exe nao encontrado. & goto menu)
-"%DIAG%" --sem-janela
+echo coleta: %DIAG% >> "%LOG%"
+"%DIAG%" --sem-janela >> "%LOG%" 2>&1
+echo (DiagBIG saiu com %errorlevel%) >> "%LOG%"
 for /f "delims=" %%f in ('dir /b /o-d "%~dp0..\DiagBIG_relatorios\*.txt" "%~dp0DiagBIG_relatorios\*.txt" 2^>nul') do (set REL=%%f & goto achou)
 echo Relatorio nao encontrado em DiagBIG_relatorios.
 goto menu
