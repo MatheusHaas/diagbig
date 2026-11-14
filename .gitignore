@@ -4,3 +4,5 @@ obj/
 TestResults/
 # especificação original fica só local
 ESPECIFICACAO_*.md
+# relatórios reais de clientes ficam só locais
+clientes-teste/
