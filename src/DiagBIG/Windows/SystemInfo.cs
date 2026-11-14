@@ -21,10 +21,7 @@ namespace DiagBIG.Windows
                     string build = k.GetValue("CurrentBuildNumber") as string ?? k.GetValue("CurrentBuild") as string;
                     object ubr = k.GetValue("UBR");
                     string sp = k.GetValue("CSDVersion") as string;
-                    int b;
-                    // O registro do Windows 11 ainda diz "Windows 10".
-                    if (build != null && int.TryParse(build, out b) && b >= 22000)
-                        product = product.Replace("Windows 10", "Windows 11");
+                    product = OsRules.NormalizeProductName(product, build);
                     string s = product;
                     if (!string.IsNullOrEmpty(display)) s += " " + display;
                     if (!string.IsNullOrEmpty(sp)) s += " " + sp;
@@ -47,7 +44,8 @@ namespace DiagBIG.Windows
             {
                 using (RegistryKey k = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion", false))
                 {
-                    o.ProductName = k.GetValue("ProductName") as string;
+                    o.ProductName = OsRules.NormalizeProductName(k.GetValue("ProductName") as string,
+                        k.GetValue("CurrentBuildNumber") as string ?? k.GetValue("CurrentBuild") as string);
                     o.EditionId = k.GetValue("EditionID") as string;
                     o.InstallationType = k.GetValue("InstallationType") as string;
                 }

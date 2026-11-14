@@ -38,6 +38,15 @@ namespace DiagBIG.Core
             return o != null && (Has(o.ProductName, "Evaluation") || Has(o.EditionId, "Evaluation"));
         }
 
+        /// <summary>O registro do Windows 11 ainda diz "Windows 10": com build 22000 ou maior, troca para "Windows 11".</summary>
+        public static string NormalizeProductName(string product, string build)
+        {
+            int b;
+            if (product != null && build != null && int.TryParse(build.Trim(), out b) && b >= 22000)
+                return product.Replace("Windows 10", "Windows 11");
+            return product;
+        }
+
         static bool Has(string s, string part) { return s != null && s.IndexOf(part, StringComparison.OrdinalIgnoreCase) >= 0; }
 
         /// <summary>Fim do suporte (atualizações de segurança) da versão, ou null se não conhecida (ex.: Windows 11, LTSC).</summary>

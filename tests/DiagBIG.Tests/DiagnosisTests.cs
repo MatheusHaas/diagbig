@@ -127,5 +127,31 @@ namespace DiagBIG.Tests
             Assert.Contains("loja.clientes", tab.Evidence + Item(d, "ARQUIVOS").Evidence);
             Assert.Equal(DiagVerdict.Provavel, Item(d, "ESPAÇO").Verdict);
         }
+
+        [Fact]
+        public void Actions_AreSentences()
+        {
+            var d = Data(Block(BlockTag.Db, false,
+                Err("[ERROR] mysqld: Disk full (x.MAI) (errno: 28 \"No space left on device\")"),
+                Err("[ERROR] InnoDB: Operating system error number 32 in a file operation.")));
+            Assert.Contains(". Antivírus", Item(d, "ESPAÇO").Action);
+        }
+
+        [Theory]
+        [InlineData("Windows 10 Home", "26200", "Windows 11 Home")]
+        [InlineData("Windows 10 Pro", "19045", "Windows 10 Pro")]
+        [InlineData("Windows 10 Pro", "22000", "Windows 11 Pro")]
+        [InlineData("Windows Server 2019 Standard", "17763", "Windows Server 2019 Standard")]
+        [InlineData("Windows 10 Home", null, "Windows 10 Home")]
+        public void Windows11_IsNotReportedAsWindows10(string product, string build, string expected)
+        {
+            Assert.Equal(expected, OsRules.NormalizeProductName(product, build));
+        }
+
+        [Fact]
+        public void Windows11_HasNoFalseSupportWarning()
+        {
+            Assert.Null(OsRules.SupportEnd(OsRules.NormalizeProductName("Windows 10 Home", "26200")));
+        }
     }
 }

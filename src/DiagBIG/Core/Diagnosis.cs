@@ -219,7 +219,7 @@ namespace DiagBIG.Core
                 if (diskFull.Count > 0 || lowSpace) { parts.Add("disco cheio/pouco espaço (" + diskFull.Count + " erro(s) do banco)"); acts.Add("liberar espaço no disco do banco; disco cheio quebra tabelas no meio da gravação (veja se as tabelas dos erros foram gravadas nessa hora)"); }
                 if (ioErr.Count > 0) { parts.Add(ioErr.Count + " erro(s) de leitura/gravação no arquivo (E/S)"); acts.Add("erro de E/S do sistema operacional é disco/controladora/rede: tratar como problema de hardware"); }
                 if (locks.Count > 0) { parts.Add(locks.Count + " erro(s) de acesso negado/arquivo em uso"); acts.Add("antivírus, backup ou outro processo mexendo na pasta data; excluir a pasta data do antivírus e do backup de arquivos abertos"); }
-                if (parts.Count > 0) { it.Verdict = DiagVerdict.Provavel; it.Evidence = string.Join("; ", parts.ToArray()) + "."; it.Action = string.Join(". ", acts.ToArray()) + "."; }
+                if (parts.Count > 0) { it.Verdict = DiagVerdict.Provavel; it.Evidence = string.Join("; ", parts.ToArray()) + "."; it.Action = Sentences(acts); }
                 else { it.Verdict = DiagVerdict.SemIndicio; it.Evidence = "Sem disco cheio, erro de E/S ou arquivo bloqueado nos logs do banco."; }
                 items.Add(it);
             }
@@ -251,7 +251,7 @@ namespace DiagBIG.Core
                 {
                     it.Verdict = (bsodRam > 0 || memTest > 0 || badSectors > 0 || smartBad) ? DiagVerdict.Provavel : DiagVerdict.Possivel;
                     it.Evidence = string.Join("; ", parts.ToArray()) + ".";
-                    it.Action = string.Join(". ", acts.ToArray()) + ". Hardware com defeito corrompe o banco de novo mesmo depois de reinstalar ou restaurar.";
+                    it.Action = Sentences(acts) + " Hardware com defeito corrompe o banco de novo mesmo depois de reinstalar ou restaurar.";
                 }
                 else { it.Verdict = DiagVerdict.SemIndicio; it.Evidence = "Nenhum erro de RAM, disco ou energia nos logs do Windows lidos (" + unexpected + " desligamento(s) inesperado(s))."; it.Action = "Isso não descarta hardware: o log só mostra o que o Windows registrou."; }
                 items.Add(it);
@@ -278,13 +278,19 @@ namespace DiagBIG.Core
                 if (startErr.Count > 0) { parts.Add(startErr.Count + " erro(s) de instalação/inicialização (porta em uso, biblioteca ou engine ausente, permissão)"); acts.Add("conferir porta ocupada por outra instância, arquivos da instalação e permissão da pasta data; se a instalação estiver incompleta, reinstalar"); }
                 if (scm.Count > 0 && startupFails == 0) { parts.Add(scm.Count + " falha(s) do serviço no Windows (Service Control Manager)"); acts.Add("ver a mensagem do serviço no bloco de eventos do banco e o .err"); }
                 if (cfgWarnings.Count > 0) { parts.Add(cfgWarnings.Count + " aviso(s) de configuração do my.ini"); acts.Add("corrigir o my.ini conforme os avisos (não corrompem sozinhos, mas aumentam o dano numa queda)"); }
-                if (parts.Count > 0) { it.Verdict = startErr.Count > 0 ? DiagVerdict.Provavel : DiagVerdict.Possivel; it.Evidence = string.Join("; ", parts.ToArray()) + "."; it.Action = string.Join(". ", acts.ToArray()) + "."; }
+                if (parts.Count > 0) { it.Verdict = startErr.Count > 0 ? DiagVerdict.Provavel : DiagVerdict.Possivel; it.Evidence = string.Join("; ", parts.ToArray()) + "."; it.Action = Sentences(acts); }
                 else { it.Verdict = DiagVerdict.SemIndicio; it.Evidence = "Sem erro de inicialização do serviço nem aviso de my.ini."; }
                 items.Add(it);
             }
 
             if (!anyDbData && !items.Any(i => i.Verdict != DiagVerdict.SemIndicio)) items.Clear();
             return items;
+        }
+
+        /// <summary>Junta as ações em frases: primeira letra maiúscula e ponto no fim.</summary>
+        static string Sentences(IEnumerable<string> acts)
+        {
+            return string.Join(" ", acts.Select(a => char.ToUpperInvariant(a[0]) + a.Substring(1).TrimEnd('.') + ".").ToArray());
         }
 
         static string Short(Occurrence o)
