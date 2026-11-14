@@ -135,6 +135,9 @@ N) Novidades da 1.6.0 (conferir na VM)
      passa a mandar tratar o hardware antes; a ação da tabela cita "hardware abaixo".
    - .err com "Plugin 'InnoDB' init function returned error" sem nome de tabela: ARQUIVOS DO BANCO = POSSÍVEL.
    - .err com "Disk full ... errno: 28": ESPAÇO, E/S E ACESSO = PROVÁVEL. Em Server Evaluation com 6008: WINDOWS = PROVÁVEL.
+   - ATALHO: pasta simulador\ (SIMULAR.bat, como administrador). Menu 1-8 simula cada cenário (eventos do Windows ou linhas no .err do
+     banco, com cópia de segurança), 9 restaura o .err, C roda o DiagBIG sem janela e mostra só "ONDE ESTÁ O PROBLEMA".
+     Precisa do MariaDB/MySQL instalado na VM (acha o .err sozinho). Eventos de tela azul/6008/WHEA não dá para simular por aqui.
    - Copiar amostras\mariadb104_corrupcao.err como log do banco e conferir loja.clientes e loja.movimento citadas.
 
 N) Novidades da 1.5.4 (conferir na VM)
