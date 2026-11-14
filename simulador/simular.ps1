@@ -21,14 +21,38 @@ function Evento($fonte, $id, $msg) {
     Write-Host "Evento gravado: $fonte $id"
 }
 
+function Servico-Banco {
+    Get-WmiObject Win32_Service | Where-Object { $_.PathName -match 'mysqld|mariadbd' } | Select-Object -First 1
+}
+
+# O banco mantem o .err aberto: para o servico, executa o bloco e sobe o servico de novo.
+function Com-Servico($bloco) {
+    $svc = Servico-Banco
+    $parou = $false
+    if ($svc -and $svc.State -eq 'Running') {
+        Write-Host "Parando o servico $($svc.Name) ..."
+        Stop-Service -Name $svc.Name -Force -ErrorAction SilentlyContinue
+        (Get-Service -Name $svc.Name).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60))
+        $parou = $true
+    }
+    try { & $bloco } catch { Write-Host "ERRO: $($_.Exception.Message)" -ForegroundColor Red }
+    if ($parou) {
+        Write-Host "Subindo o servico $($svc.Name) ..."
+        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+        Write-Host ("Servico: " + (Get-Service -Name $svc.Name).Status + "")
+    }
+}
+
 function Linhas-Err($linhas) {
     $f = Achar-Err
-    if (-not $f) { Write-Host "NAO ACHEI o .err. Passe o caminho: SIMULAR.bat" -ForegroundColor Red; return }
-    $bak = $f + ".bak-diagbig"
-    if (-not (Test-Path $bak)) { Copy-Item $f $bak; Write-Host "Copia de seguranca: $bak" }
-    $t = (Get-Date).AddMinutes(-5).ToString("yyyy-MM-dd HH:mm:ss")
-    $linhas | ForEach-Object { Add-Content -Path $f -Value ($t + " " + $_) -Encoding Default }
-    Write-Host "Linhas gravadas em $f"
+    if (-not $f) { Write-Host "NAO ACHEI o .err. Passe o caminho: simular.ps1 -Err <arquivo>" -ForegroundColor Red; return }
+    Com-Servico {
+        $bak = $f + ".bak-diagbig"
+        if (-not (Test-Path $bak)) { Copy-Item $f $bak; Write-Host "Copia de seguranca: $bak" }
+        $t = (Get-Date).AddMinutes(-5).ToString("yyyy-MM-dd HH:mm:ss")
+        $linhas | ForEach-Object { Add-Content -Path $f -Value ($t + " " + $_) -Encoding Default }
+        Write-Host "Linhas gravadas em $f"
+    }
 }
 
 switch ($Cenario) {
@@ -58,7 +82,7 @@ switch ($Cenario) {
       "11 [ERROR] InnoDB: Operating system error number 32 in a file operation.",
       "11 [ERROR] InnoDB: The error means that another program is using the file (Access is denied).") }
  9 { $f = Achar-Err
-     if ($f -and (Test-Path ($f + ".bak-diagbig"))) { Copy-Item ($f + ".bak-diagbig") $f -Force; Remove-Item ($f + ".bak-diagbig"); Write-Host "Restaurado: $f" }
+     if ($f -and (Test-Path ($f + ".bak-diagbig"))) { Com-Servico { Copy-Item ($f + ".bak-diagbig") $f -Force; Remove-Item ($f + ".bak-diagbig"); Write-Host "Restaurado: $f" } }
      else { Write-Host "Nada para restaurar." } }
  default { Write-Host "Cenario invalido." }
 }
