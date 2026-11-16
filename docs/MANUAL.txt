@@ -137,6 +137,28 @@ ONDE ESTÁ O PROBLEMA
   Só enxerga o que está nos logs: não prova a causa. Para confirmar, rodar
   CHECK TABLE e testar RAM e disco.
 
+REPARO DO WINDOWS (DISM/SFC JÁ EXECUTADOS)
+  Na seção DISCO / NTFS. Lê o dism.log e o CBS.log e lista as falhas de quem já
+  rodou DISM /RestoreHealth ou sfc /scannow (ex.: 0x800f0915, "SFC não reparou").
+  Falha de reparo junto com evento de disco = trocar o disco. Sem evento de disco:
+  tentar DISM com /Source de um ISO da mesma versão e, se falhar, reinstalar.
+
+BOTÃO VERIFICAR DISCO (chkdsk /scan)
+  Roda chkdsk /scan em cada disco fixo (só leitura, não corrige nada), mostra o
+  resultado e grava DiagBIG_chkdsk_<PC>_<data>.txt ao lado do relatório. Se o
+  relatório já indica disco com defeito grave, pede confirmação: ler o disco
+  inteiro pode piorar. chkdsk /f e /r continuam manuais, depois do backup.
+
+O QUE FAZER (PASSO A PASSO)
+  Vem depois de ONDE ESTÁ O PROBLEMA. Duas rotas:
+  - Disco com defeito grave (setor defeituoso, NTFS 55/98, SMART em atenção ou
+    muito disk 153): TROCAR o disco/servidor. Não reinstalar nem restaurar no
+    mesmo disco; copiar os dados antes e não rodar chkdsk /r, DISM ou SFC nele.
+  - Sem defeito grave de disco: salvar os dados, testar a RAM se houver indício,
+    chkdsk /scan, DISM /Online /Cleanup-Image /RestoreHealth, sfc /scannow,
+    e só então reinstalar Windows e MariaDB e restaurar o dump. Se voltar a cair,
+    é hardware. DISM e SFC reparam só arquivos do Windows, não o NTFS nem o banco.
+
 CAUSAS PROVÁVEIS
   BANCO NÃO SOBE (fica no topo): o InnoDB aborta na inicialização, em geral
   por página corrompida. Mostra as tabelas afetadas e o passo a passo:

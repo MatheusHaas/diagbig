@@ -274,6 +274,79 @@ namespace DiagBIG.Tests
         }
 
         [Fact]
+        public void StrongDiskEvidence_ComesBeforeBlueScreenRam()
+        {
+            var power = Block(BlockTag.Power, true, Kp41(0x1A));
+            var disk = Block(BlockTag.Disk, true, Ev("disk", 7, "O dispositivo tem um bloco inválido."));
+            var db = Block(BlockTag.Db, false, new Occurrence { Time = T, Source = ".err", Message = "InnoDB: Database page corruption", SummaryKey = "corruption" });
+            List<string> h = Hypotheses.Analyze(Data(power, disk, db));
+            Assert.True(h.FindIndex(x => x.StartsWith("Disco com setor defeituoso")) < h.FindIndex(x => x.StartsWith("Possível causa: RAM")));
+        }
+
+        [Fact]
+        public void ManyDisk153_MakesDiskSuspectAndComesBeforeRam()
+        {
+            var power = Block(BlockTag.Power, true, Kp41(0x1A));
+            var evs = Enumerable.Range(0, Config.DiskRetryThreshold).Select(_ => Ev("disk", 153, "E/S repetida")).ToArray();
+            var db = Block(BlockTag.Db, false, new Occurrence { Time = T, Source = ".err", Message = "InnoDB: Database page corruption", SummaryKey = "corruption" });
+            List<string> h = Hypotheses.Analyze(Data(power, Block(BlockTag.Disk, true, evs), db));
+            int disk = h.FindIndex(x => x.StartsWith("Disco, cabo ou controladora") && x.Contains("disk 153"));
+            Assert.True(disk >= 0 && disk < h.FindIndex(x => x.StartsWith("Possível causa: RAM")));
+        }
+
+        [Fact]
+        public void WheaRam_StaysBeforeDisk()
+        {
+            var hw = Block(BlockTag.Hardware, true, Ev("Microsoft-Windows-WHEA-Logger", 18, "erro de hardware"));
+            var disk = Block(BlockTag.Disk, true, Ev("disk", 7, "O dispositivo tem um bloco inválido."));
+            var db = Block(BlockTag.Db, false, new Occurrence { Time = T, Source = ".err", Message = "InnoDB: Database page corruption", SummaryKey = "corruption" });
+            List<string> h = Hypotheses.Analyze(Data(hw, disk, db));
+            Assert.True(h.FindIndex(x => x.StartsWith("Possível causa: RAM")) < h.FindIndex(x => x.StartsWith("Disco com setor defeituoso")));
+        }
+
+        static Occurrence DbLine(string msg, string key) => new Occurrence { Time = T, Source = ".err", Message = msg, SummaryKey = key };
+
+        [Fact]
+        public void ActionPlan_FatalDisk_SaysReplaceNotReinstall()
+        {
+            var d = Data(Block(BlockTag.Disk, true, Ev("disk", 7, "O dispositivo tem um bloco inválido.")),
+                         Block(BlockTag.Db, false, DbLine("InnoDB: Database page corruption", "corruption")));
+            var plan = ActionPlan.Build(d);
+            Assert.StartsWith("VEREDITO: DISCO COM DEFEITO GRAVE", plan[0]);
+            Assert.Contains("TROCAR o disco", plan[0]);
+            Assert.Contains(plan, x => x.Contains("NÃO rodar chkdsk /r, DISM nem SFC"));
+            Assert.DoesNotContain(plan, x => x.Contains("DISM /Online"));
+        }
+
+        [Fact]
+        public void ActionPlan_NoFatalDisk_TriesChkdskDismSfcThenReinstall()
+        {
+            var d = Data(Block(BlockTag.Power, true, Kp41(0x1A)),
+                         Block(BlockTag.Db, false, DbLine("InnoDB: Database page corruption", "corruption")));
+            var plan = ActionPlan.Build(d);
+            Assert.StartsWith("VEREDITO: sem defeito grave de disco", plan[0]);
+            int chk = plan.FindIndex(x => x.Contains("chkdsk C: /scan"));
+            int dism = plan.FindIndex(x => x.Contains("DISM /Online /Cleanup-Image /RestoreHealth"));
+            int reinst = plan.FindIndex(x => x.Contains("reinstalar o Windows"));
+            Assert.True(chk > 0 && chk < dism && dism < reinst);
+            Assert.Contains(plan, x => x.Contains("RAM primeiro"));
+        }
+
+        [Fact]
+        public void ActionPlan_NothingWrong_IsEmpty() => Assert.Empty(ActionPlan.Build(Data(Block(BlockTag.Disk, true))));
+
+        [Fact]
+        public void StartupFailure_ButServiceRunning_SaysRunningNotStuck()
+        {
+            var db = Block(BlockTag.Db, false, DbLine("[ERROR] Plugin 'InnoDB' init function returned error.", "init function returned error"));
+            var d = Data(db);
+            d.DbServiceRunning = true;
+            Assert.StartsWith("BANCO FALHOU AO SUBIR", Hypotheses.Analyze(d)[0]);
+            d.DbServiceRunning = false;
+            Assert.StartsWith("BANCO NÃO SOBE", Hypotheses.Analyze(d)[0]);
+        }
+
+        [Fact]
         public void OtherDiskEvent_IsNotBadSector()
         {
             var disk = Block(BlockTag.Disk, true, Ev("disk", 153, "A operação de E/S foi repetida"));

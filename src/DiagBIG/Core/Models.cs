@@ -51,6 +51,7 @@ namespace DiagBIG.Core
         public const string Smart = "smart";
         public const string Power = "power";
         public const string Hardware = "hardware";
+        public const string Repair = "repair";
         public const string Db = "db";
         public const string DbEvents = "dbevents";
     }
@@ -111,6 +112,10 @@ namespace DiagBIG.Core
         public List<string> Hypotheses { get; } = new List<string>();
         /// <summary>Onde está o problema (calculado por Diagnosis).</summary>
         public List<DiagItem> Diagnosis { get; } = new List<DiagItem>();
+        /// <summary>O que fazer, passo a passo (calculado por ActionPlan): primeira linha é o veredito.</summary>
+        public List<string> ActionPlan { get; } = new List<string>();
+        /// <summary>true = algum serviço do banco está rodando agora; false = nenhum; null = sem serviço encontrado.</summary>
+        public bool? DbServiceRunning { get; set; }
         public List<ReportSection> Sections { get; } = new List<ReportSection>();
     }
 }

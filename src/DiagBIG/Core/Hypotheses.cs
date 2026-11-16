@@ -59,6 +59,12 @@ namespace DiagBIG.Core
             return set.ToList();
         }
 
+        /// <summary>innodb_force_recovery ativo no my.ini (aviso gerado por DbConfigWarnings).</summary>
+        public static bool ForceRecoveryOn(ReportData d)
+        {
+            return Blocks(d, BlockTag.Db).SelectMany(b => b.Warnings).Any(w => w.StartsWith("innodb_force_recovery=", StringComparison.OrdinalIgnoreCase));
+        }
+
         static IEnumerable<ReportBlock> Blocks(ReportData d, string tag)
         {
             return d.Sections.SelectMany(s => s.Blocks).Where(b => b.Tag == tag && b.Verified);
@@ -129,34 +135,37 @@ namespace DiagBIG.Core
 
             bool ramEvidence = bsodRam > 0 || memTestFailed > 0 || whea > 0;
 
-            // 1) RAM
+            // 1) RAM (entra na lista depois do disco quando o disco tem evidência mais forte)
+            var ramR = new List<string>();
             if (ramEvidence && dbDamaged)
             {
                 var ev = RamEvidence(infos, bsodRam, bsodRamDriver, memTestFailed, whea);
-                result.Add("Possível causa: RAM defeituosa (" + ev + "). Não está confirmada: a queda/corrupção do banco também pode vir de bug do MariaDB, disco, energia ou do my.ini. " +
+                ramR.Add("Possível causa: RAM defeituosa (" + ev + "). Não está confirmada: a queda/corrupção do banco também pode vir de bug do MariaDB, disco, energia ou do my.ini. " +
                            "Testar a memória (MemTest86, várias passadas, ou mdsched.exe) e testar pente a pente ANTES de restaurar o banco; " +
                            "senão a base pode corromper de novo.");
             }
             else if (ramEvidence)
             {
-                result.Add("Indícios de RAM com defeito (" + RamEvidence(infos, bsodRam, bsodRamDriver, memTestFailed, whea) +
+                ramR.Add("Indícios de RAM com defeito (" + RamEvidence(infos, bsodRam, bsodRamDriver, memTestFailed, whea) +
                            "). Testar a memória (MemTest86 ou mdsched.exe) e testar pente a pente.");
             }
             else if (bsodRamDriver > 0)
             {
-                result.Add("Tela azul de driver ou RAM (" + string.Join(", ", infos.Where(i => i.Suspect == BugcheckSuspect.RamOuDriver || i.Suspect == BugcheckSuspect.Hardware).Select(i => i.Name).Distinct().ToArray()) +
+                ramR.Add("Tela azul de driver ou RAM (" + string.Join(", ", infos.Where(i => i.Suspect == BugcheckSuspect.RamOuDriver || i.Suspect == BugcheckSuspect.Hardware).Select(i => i.Name).Distinct().ToArray()) +
                            "): rodar o teste de memória e atualizar drivers (placa de vídeo, rede, chipset).");
             }
 
             // 2) disco
+            var diskR = new List<string>();
+            int diskRetries = Occ(d, BlockTag.Disk).Count(o => string.Equals(Grouping.ShortSource(o.Source), "disk", StringComparison.OrdinalIgnoreCase) && o.EventId == "153");
             int badSectors = Occ(d, BlockTag.Disk).Count(IsBadSector);
             if (badSectors > 0)
-                result.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s)): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
+                diskR.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s)): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
                            "Fazer backup agora. " + (smartBad ? "" : "O SMART não acusou falha, mas SMART OK não descarta o disco: o setor ruim pode já ter sido remapeado ou o disco estar atrás de RAID. ") +
                            "chkdsk /r não conserta disco que está morrendo.");
             int ntfsCorrupt = Occ(d, BlockTag.Disk).Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && o.EventId == "55");
             if (ntfsCorrupt > 0)
-                result.Add("Sistema de arquivos corrompido (Ntfs 55, " + ntfsCorrupt + "x): o NTFS achou erro na estrutura do volume (pode vir de desligamento brusco, energia, controladora ou disco ruim). " +
+                diskR.Add("Sistema de arquivos corrompido (Ntfs 55, " + ntfsCorrupt + "x): o NTFS achou erro na estrutura do volume (pode vir de desligamento brusco, energia, controladora ou disco ruim). " +
                            "Fazer backup ANTES de reparar, depois rodar chkdsk /scan e, na janela de manutenção, chkdsk /f (o /r também procura setor ruim e demora). " +
                            "SFC/DISM não reparam o NTFS. Se voltar depois do chkdsk, suspeitar do disco, cabo, controladora ou energia" +
                            (badSectors > 0 ? "; junto com o setor defeituoso acima, tratar como disco com falha." : "."));
@@ -164,11 +173,26 @@ namespace DiagBIG.Core
             {
                 var ev = new List<string>();
                 if (bsodDisk > 0) ev.Add("tela azul de disco: " + string.Join(", ", infos.Where(i => i.Suspect == BugcheckSuspect.Disco).Select(i => i.Name).Distinct().ToArray()));
+                if (diskRetries >= Config.DiskRetryThreshold) ev.Add("disk 153 (E/S repetida pelo Windows) " + diskRetries + "x: o disco está falhando ou lento demais");
                 if (diskEvents) ev.Add("eventos de disco/NTFS");
                 if (smartBad) ev.Add("SMART/confiabilidade em ATENÇÃO");
-                result.Add("Disco, cabo ou controladora sob suspeita (" + string.Join("; ", ev.ToArray()) + "). Fazer backup agora e rodar chkdsk /scan e a ferramenta do fabricante do disco." +
+                diskR.Add("Disco, cabo ou controladora sob suspeita (" + string.Join("; ", ev.ToArray()) + "). Fazer backup agora e rodar chkdsk /scan e a ferramenta do fabricante do disco." +
                            (diskEvents && !smartBad && d.Summary.Any(x => x.Label == "SMART" && x.Status == CheckStatus.Ok) ? " SMART OK não descarta o disco quando há eventos de disco." : ""));
             }
+
+            // Disco com evidência forte (setor ruim, NTFS 55, E/S repetida em volume) vem antes da RAM,
+            // a não ser que a RAM tenha prova direta (WHEA ou teste de memória do Windows falhou).
+            var repairFails = Occ(d, BlockTag.Repair).ToList();
+            if (repairFails.Count > 0)
+            {
+                var repairKeys = repairFails.Select(o => o.SummaryKey).Distinct().ToList();
+                diskR.Add("DISM/SFC já falharam neste PC (" + string.Join("; ", repairKeys.ToArray()) + "): arquivos do Windows corrompidos que o reparo não conseguiu consertar. " +
+                          (diskEvents ? "Junto com os eventos de disco/NTFS, tratar como disco com falha: trocar o disco, não reinstalar no mesmo."
+                                      : "Sem evento de disco nos logs: tentar DISM com /Source de um ISO da mesma versão; se falhar de novo, reinstalar o Windows limpo; se a corrupção voltar, suspeitar do disco/RAM."));
+            }
+            bool diskStrong = badSectors > 0 || ntfsCorrupt > 0 || diskRetries >= Config.DiskRetryThreshold || (repairFails.Count > 0 && diskEvents);
+            if (diskStrong && memTestFailed == 0 && whea == 0) { result.AddRange(diskR); result.AddRange(ramR); }
+            else { result.AddRange(ramR); result.AddRange(diskR); }
 
             // 3) driver
             if (bsodDriver > 0)
@@ -204,6 +228,12 @@ namespace DiagBIG.Core
                 string loop = startupFails >= Config.CrashLoopThreshold ? ", em LOOP: o serviço tenta subir e cai sem parar" : "";
                 string tabs = tables.Count == 0 ? "" :
                     " Tabelas com página corrompida: " + string.Join(", ", tables.Take(10).ToArray()) + (tables.Count > 10 ? " e mais " + (tables.Count - 10) : "") + ".";
+                if (d.DbServiceRunning == true)
+                    result.Insert(0, "BANCO FALHOU AO SUBIR " + startupFails + " vez(es) (o InnoDB abortou na inicialização) e AGORA O SERVIÇO ESTÁ RODANDO" +
+                                     (ForceRecoveryOn(d) ? " em modo de recuperação (innodb_force_recovery no my.ini): o banco só lê, não grava" : "") + "." + tabs +
+                                     " Tirar o dump AGORA, com a porta trocada para o sistema do cliente não conectar; depois parar, remover a opção de recuperação e restaurar o dump num banco novo (datadir limpo). " +
+                                     "Se o sistema voltou a gravar sem dump feito, o dano pode ter piorado. A causa da corrupção (energia, RAM, disco) precisa ser tratada, senão volta.");
+                else
                 result.Insert(0, "BANCO NÃO SOBE: o InnoDB aborta na inicialização (" + startupFails + " tentativa(s) falhou" + loop + ")." + tabs +
                                  " Procedimento: parar o serviço e copiar a pasta data ANTES de mexer; no my.ini, em [mysqld], pôr innodb_force_recovery=1 e subir o serviço " +
                                  "(se não subir, aumentar de 1 em 1, até 3; 4 ou mais pode perder dados); com o banco no ar, tirar o dump, parar, remover a opção e restaurar do dump ou do backup. " +

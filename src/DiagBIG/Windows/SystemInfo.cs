@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Net;
 using System.Management;
 using DiagBIG.Core;
 using Microsoft.Win32;
@@ -10,6 +11,21 @@ namespace DiagBIG.Windows
 {
     internal static class SystemInfo
     {
+        /// <summary>
+        /// Nome do PC como o banco usa no nome do .err (gethostname). Environment.MachineName corta em 15
+        /// caracteres (limite do NetBIOS), então "SERVIDOR-CENTRAL" virava "SERVIDOR-CENTRA".
+        /// </summary>
+        public static string HostName()
+        {
+            try
+            {
+                string h = Dns.GetHostName();
+                if (!string.IsNullOrWhiteSpace(h)) return h;
+            }
+            catch (Exception) { }
+            return Environment.MachineName;
+        }
+
         public static string WindowsVersion()
         {
             try

@@ -30,7 +30,7 @@ namespace DiagBIG.Windows
             DateTime now = DateTime.Now;
             var d = new ReportData
             {
-                ComputerName = Environment.MachineName,
+                ComputerName = SystemInfo.HostName(),
                 CollectedAt = now,
                 PeriodDays = days,
                 Since = now.AddDays(-days),
@@ -94,6 +94,11 @@ namespace DiagBIG.Windows
             smartBlock.Tag = BlockTag.Smart;
             diskSection.Blocks.Add(smartBlock);
             d.Summary.Add(smartSummary);
+            progress("Lendo dism.log e CBS.log...");
+            ReportBlock repair = ReadRepairLogs(d.Since);
+            diskSection.Blocks.Add(repair);
+            if (!repair.InfoOnly)
+                d.Summary.Add(ReportBuilder.Summarize("REPARO DO WINDOWS (DISM/SFC)", new[] { repair }));
             d.Sections.Add(diskSection);
 
             // ---------- Reinícios e desligamentos ----------
@@ -227,8 +232,10 @@ namespace DiagBIG.Windows
             d.Sections.Add(evSection);
 
             progress("Montando relatório...");
+            d.DbServiceRunning = services.Count == 0 ? (bool?)null : services.Any(s => s.Status == "rodando");
             try { d.Hypotheses.AddRange(Hypotheses.Analyze(d)); } catch (Exception) { }
             try { d.Diagnosis.AddRange(Diagnosis.Analyze(d)); } catch (Exception) { }
+            try { d.ActionPlan.AddRange(ActionPlan.Build(d)); } catch (Exception) { }
             var r = new CollectionResult { Data = d };
             r.FullText = ReportBuilder.BuildFull(d);
             r.ResumoText = ReportBuilder.BuildResumo(d);
@@ -308,6 +315,44 @@ namespace DiagBIG.Windows
         static KeyValuePair<List<Occurrence>, bool> Tuple(List<Occurrence> list, bool capped)
         {
             return new KeyValuePair<List<Occurrence>, bool>(list, capped);
+        }
+
+        /// <summary>DISM e SFC deixam o resultado em dism.log e CBS.log; se alguém já tentou reparar e falhou, aparece aqui.</summary>
+        static ReportBlock ReadRepairLogs(DateTime since)
+        {
+            var b = new ReportBlock { Title = "REPARO DO WINDOWS (DISM/SFC JÁ EXECUTADOS)", IsEvents = false, Tag = BlockTag.Repair };
+            try
+            {
+                string root = Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows";
+                string dismPath = Path.Combine(root, @"Logs\DISM\dism.log");
+                string cbsPath = Path.Combine(root, @"Logs\CBS\CBS.log");
+                string dism = null, cbs = null;
+                if (File.Exists(dismPath)) dism = ReadLogTail(dismPath, 6L * 1024 * 1024, b);
+                if (File.Exists(cbsPath)) cbs = ReadLogTail(cbsPath, 10L * 1024 * 1024, b);
+                if (dism == null && cbs == null)
+                {
+                    b.InfoOnly = true;
+                    b.Info.Add("dism.log e CBS.log não encontrados em " + root + @"\Logs: DISM/SFC nunca rodaram neste PC.");
+                    return b;
+                }
+                RepairResult r = RepairLogAnalyzer.Analyze(dism, cbs, since);
+                b.Occurrences.AddRange(r.Failures);
+                b.Info.Add("DISM e SFC registram o resultado aqui. Só aparece o que alguém já rodou (DISM /RestoreHealth, sfc /scannow).");
+                b.Info.Add("Último DISM no período: " + (r.LastDismRun == null ? "nenhum" : ReportBuilder.DateTimeLong(r.LastDismRun)) +
+                           " | última verificação do SFC: " + (r.LastSfcVerify == null ? "nenhuma" : ReportBuilder.DateTimeLong(r.LastSfcVerify)) +
+                           " | arquivos reparados pelo SFC: " + r.SfcRepaired);
+                if (r.LastDismRun == null && r.LastSfcVerify == null) b.SummaryNote = "DISM/SFC não rodaram no período";
+            }
+            catch (Exception ex) { b.Verified = false; b.NotVerifiedReason = "falha ao ler dism.log/CBS.log: " + ex.Message; }
+            return b;
+        }
+
+        static string ReadLogTail(string path, long maxBytes, ReportBlock b)
+        {
+            ErrReadResult r = ErrTailReader.ReadTail(path, maxBytes);
+            if (r.Truncated)
+                b.Info.Add("AVISO: " + Path.GetFileName(path) + ": lidos só os últimos " + ReportBuilder.FormatBytes(r.BytesRead) + " de " + ReportBuilder.FormatBytes(r.FileSize) + ".");
+            return r.Text;
         }
 
         static ReportBlock RunEvents(string title, Func<KeyValuePair<List<Occurrence>, bool>> query)

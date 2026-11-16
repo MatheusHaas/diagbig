@@ -142,7 +142,7 @@ namespace DiagBIG.Windows
             else t.Info.Add("Config ........: " + string.Join(" + ", read.ToArray()) +
                             (read.Count > 1 ? " (lidos nessa ordem; o último prevalece)" : ""));
 
-            DbPaths paths = DbPathResolver.Resolve(opt, baseDir, Environment.MachineName);
+            DbPaths paths = DbPathResolver.Resolve(opt, baseDir, SystemInfo.HostName());
             t.Info.Add("Datadir .......: " + paths.DataDir);
             t.DataDir = paths.DataDir;
 

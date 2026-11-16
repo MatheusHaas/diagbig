@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.6.1";
+        public const string Version = "1.6.2";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -67,6 +67,8 @@ namespace DiagBIG.Core
         public const int ResourceExhaustionId = 2004;
         /// <summary>Quantas quedas do banco no período para falar em "loop de crash".</summary>
         public const int CrashLoopThreshold = 5;
+        /// <summary>Quantos disk 153 (E/S repetida) no período para tratar o disco como suspeito forte.</summary>
+        public const int DiskRetryThreshold = 50;
 
         // ---------------- Parte 2: banco MySQL/MariaDB ----------------
 

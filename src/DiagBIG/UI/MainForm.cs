@@ -22,6 +22,7 @@ namespace DiagBIG.UI
         readonly Button copySummary = new Button();
         readonly Button openTxt = new Button();
         readonly Button openFolder = new Button();
+        readonly Button chkdsk = new Button();
         readonly Label copied = new Label();
         readonly System.Windows.Forms.Timer copiedTimer = new System.Windows.Forms.Timer();
 
@@ -75,7 +76,8 @@ namespace DiagBIG.UI
             Setup(copySummary, "Copiar resumo", (s, e) => Copy(last == null ? null : last.ResumoText));
             Setup(openTxt, "Abrir TXT", (s, e) => OpenTxt());
             Setup(openFolder, "Abrir pasta", (s, e) => OpenFolder());
-            bottom.Controls.AddRange(new Control[] { copyAll, copySummary, openTxt, openFolder });
+            Setup(chkdsk, "Verificar disco (chkdsk /scan)", (s, e) => RunChkdsk());
+            bottom.Controls.AddRange(new Control[] { copyAll, copySummary, openTxt, openFolder, chkdsk });
             copied.Text = "Copiado!";
             copied.AutoSize = true;
             copied.ForeColor = Color.DarkGreen;
@@ -132,7 +134,7 @@ namespace DiagBIG.UI
         void SetBusy(bool busy)
         {
             running = busy;
-            collect.Enabled = period.Enabled = !busy;
+            collect.Enabled = period.Enabled = chkdsk.Enabled = !busy;
             copyAll.Enabled = copySummary.Enabled = !busy && last != null;
             openTxt.Enabled = openFolder.Enabled = !busy && last != null && last.SavedPath != null;
             UseWaitCursor = busy;
@@ -210,6 +212,20 @@ namespace DiagBIG.UI
         void ShowHelp()
         {
             using (var f = new HelpForm(Icon)) f.ShowDialog(this);
+        }
+
+        void RunChkdsk()
+        {
+            if (running) return;
+            bool fatal = last != null && last.Data != null && last.Data.ActionPlan.Count > 0 && last.Data.ActionPlan[0].StartsWith("VEREDITO: DISCO COM DEFEITO GRAVE", StringComparison.Ordinal);
+            if (fatal && MessageBox.Show(this,
+                    "O relatório já indica DISCO COM DEFEITO GRAVE (veja O QUE FAZER). O chkdsk lê o disco inteiro e pode piorar um disco que está morrendo.\r\n\r\n" +
+                    "Faça o backup antes. Continuar mesmo assim?", "DiagBIG", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            string dir;
+            try { dir = last != null && last.SavedPath != null ? Path.GetDirectoryName(last.SavedPath) : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory); }
+            catch (Exception) { dir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory); }
+            using (var f = new ChkdskForm(Icon, dir, last != null && last.Data != null ? last.Data.ComputerName : SystemInfo.HostName())) f.ShowDialog(this);
         }
 
         void OpenTxt()

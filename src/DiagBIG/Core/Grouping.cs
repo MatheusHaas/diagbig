@@ -56,6 +56,28 @@ namespace DiagBIG.Core
                 .ToList();
         }
 
+        /// <summary>
+        /// Como Latest, mas garante a ocorrência mais recente de cada tipo (até maxTypes tipos, os mais frequentes),
+        /// para um evento raro e grave (ex.: setor defeituoso) não ficar escondido atrás de centenas de avisos repetidos.
+        /// O resultado vem em ordem do mais recente para o mais antigo.
+        /// </summary>
+        public static List<Occurrence> LatestWithTypes(IEnumerable<Occurrence> items, int max, int maxTypes)
+        {
+            var all = items.ToList();
+            var chosen = new HashSet<Occurrence>();
+            foreach (OccurrenceGroup g in Group(all).Take(Math.Min(maxTypes, max / 2)))
+            {
+                Occurrence rep = Latest(all.Where(o => string.Equals(o.GroupKey ?? "", g.Key, StringComparison.OrdinalIgnoreCase)), 1).FirstOrDefault();
+                if (rep != null) chosen.Add(rep);
+            }
+            foreach (Occurrence o in Latest(all, all.Count))
+            {
+                if (chosen.Count >= max) break;
+                chosen.Add(o);
+            }
+            return Latest(chosen, max);
+        }
+
         /// <summary>"Microsoft-Windows-Ntfs" → "Ntfs".</summary>
         public static string ShortSource(string provider)
         {

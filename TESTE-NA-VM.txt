@@ -128,6 +128,19 @@ Amostras (pasta amostras\)
 - my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.
 
 
+N) Novidades da 1.6.2 (conferir na VM)
+   - Nome do PC com 16+ caracteres (ex.: SERVIDOR-CENTRAL): PC e ARQUIVO mostram o nome inteiro (antes cortava em 15) e o .err é achado
+     sem o AVISO falso de "SERVIDOR-CENTRA.err não existe".
+   - Com setor ruim/Ntfs 55/muito disk 153, a causa do disco vem ANTES da RAM; as "ÚLTIMAS 30" incluem a última de cada tipo.
+   - Banco que falhou ao subir mas está RODANDO: causa 1 diz "BANCO FALHOU AO SUBIR ... AGORA O SERVIÇO ESTÁ RODANDO"; parado = "BANCO NÃO SOBE".
+   - Nova sessão "O QUE FAZER (PASSO A PASSO)" depois de ONDE ESTÁ O PROBLEMA: disco grave = TROCAR (sem reinstalar no mesmo);
+     senão chkdsk /scan, DISM, SFC, reinstalar. Simular: Write-EventLog -Source disk -EventId 7 -EntryType Error -Message "bloco inválido".
+   - Bloco "REPARO DO WINDOWS (DISM/SFC JÁ EXECUTADOS)" em DISCO / NTFS e linha no RESUMO. Rodar "DISM /Online /Cleanup-Image /RestoreHealth"
+     sem internet (dá 0x800f0915/0x800f081f) e coletar: deve listar "DISM falhou 0x800f0915 — conteúdo de reparo não encontrado".
+     Com evento de disco junto, O QUE FAZER vira TROCAR O DISCO; sem evento de disco manda tentar DISM com /Source de ISO.
+   - Botão "Verificar disco (chkdsk /scan)": roda em cada disco fixo (só leitura), mostra a saída, resultado no fim e grava
+     DiagBIG_chkdsk_<PC>_<data>.txt ao lado do relatório. Se o relatório já diz DISCO COM DEFEITO GRAVE, pede confirmação antes.
+
 N) Novidades da 1.6.1 (conferir na VM)
    - Windows 11: em SISTEMA OPERACIONAL, EDIÇÃO deve dizer "Windows 11 ..." (igual ao cabeçalho) e a linha SUPORTE não aparece mais
      (antes dava falso aviso de "sem atualizações desde 14/10/2025"). Em Windows 10 de verdade (build abaixo de 22000) continua o aviso.

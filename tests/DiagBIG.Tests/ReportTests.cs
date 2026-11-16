@@ -156,6 +156,20 @@ namespace DiagBIG.Tests
         }
 
         [Fact]
+        public void LatestWithTypes_KeepsRareTypeBehindRepeatedOnes()
+        {
+            var list = new List<Occurrence>();
+            for (int i = 0; i < 100; i++)
+                list.Add(new Occurrence { Time = new DateTime(2026, 11, 10).AddMinutes(i), GroupKey = "disk 153", Message = "repetida " + i });
+            list.Add(new Occurrence { Time = new DateTime(2026, 11, 1), GroupKey = "disk 7", Message = "setor ruim" });
+            var l = Grouping.LatestWithTypes(list, 30, 10);
+            Assert.Equal(30, l.Count);
+            Assert.Contains(l, o => o.Message == "setor ruim");
+            Assert.Equal("repetida 99", l[0].Message);
+            Assert.Equal("setor ruim", l[l.Count - 1].Message);
+        }
+
+        [Fact]
         public void LatestPutsUndatedLast()
         {
             var l = Grouping.Latest(new[]

@@ -184,7 +184,7 @@ namespace DiagBIG.Core
                 else if (startupFails > 0)
                 {
                     it.Verdict = DiagVerdict.Possivel;
-                    it.Evidence = "O banco não sobe (" + startupFails + " tentativa(s)) " + (tables.Count > 0 ? "e há tabela corrompida citada: pode ser só ela." : "sem tabela citada: o dano pode estar nos arquivos de sistema do InnoDB.");
+                    it.Evidence = (d.DbServiceRunning == true ? "O banco falhou ao subir (" + startupFails + " tentativa(s)) e agora está rodando " : "O banco não sobe (" + startupFails + " tentativa(s)) ") + (tables.Count > 0 ? "e há tabela corrompida citada: pode ser só ela." : "sem tabela citada: o dano pode estar nos arquivos de sistema do InnoDB.");
                     it.Action = "Subir com innodb_force_recovery=1 (até 3) e tirar o dump; se subir assim, o dano é recuperável. Se só subir com 4 ou mais, é dano nos arquivos de sistema: reinstalar e restaurar do backup.";
                 }
                 else { it.Verdict = DiagVerdict.SemIndicio; it.Evidence = "Nada apontando para ibdata1/redo log/dicionário."; }
@@ -228,24 +228,30 @@ namespace DiagBIG.Core
             {
                 var it = new DiagItem { Area = "HARDWARE (RAM, DISCO, ENERGIA)" };
                 var parts = new List<string>(); var acts = new List<string>();
+                var ramParts = new List<string>(); var ramActs = new List<string>();
+                var diskParts = new List<string>(); var diskActs = new List<string>();
                 if (bsodRam > 0 || memTest > 0 || whea > 0)
                 {
                     var r = new List<string>();
                     if (bsodRam > 0) r.Add(bsodRam + " tela(s) azul(is) de memória");
                     if (whea > 0) r.Add(whea + " erro(s) WHEA");
                     if (memTest > 0) r.Add("teste de memória do Windows falhou");
-                    parts.Add("RAM/plataforma (" + string.Join("; ", r.ToArray()) + ")");
-                    acts.Add("testar a RAM (MemTest86, pente a pente) antes de restaurar o banco; se confirmar, trocar o pente");
+                    ramParts.Add("RAM/plataforma (" + string.Join("; ", r.ToArray()) + ")");
+                    ramActs.Add("testar a RAM (MemTest86, pente a pente) antes de restaurar o banco; se confirmar, trocar o pente");
                 }
                 if (badSectors > 0 || smartBad)
                 {
                     var r = new List<string>();
                     if (badSectors > 0) r.Add(badSectors + " bad block");
                     if (smartBad) r.Add("SMART em atenção");
-                    parts.Add("disco com defeito (" + string.Join("; ", r.ToArray()) + ")");
-                    acts.Add("backup agora e trocar o disco/servidor");
+                    diskParts.Add("disco com defeito (" + string.Join("; ", r.ToArray()) + ")");
+                    diskActs.Add("backup agora e trocar o disco/servidor");
                 }
-                else if (disk.Count > 0 || ntfs55 > 0) { parts.Add(disk.Count + " evento(s) de disco/NTFS" + (ntfs55 > 0 ? " (inclui NTFS 55)" : "")); acts.Add("backup, chkdsk /scan e ferramenta do fabricante; se voltar, suspeitar de disco, cabo ou controladora"); }
+                else if (disk.Count > 0 || ntfs55 > 0) { diskParts.Add(disk.Count + " evento(s) de disco/NTFS" + (ntfs55 > 0 ? " (inclui NTFS 55)" : "")); diskActs.Add("backup, chkdsk /scan e ferramenta do fabricante; se voltar, suspeitar de disco, cabo ou controladora"); }
+                // Disco com evidência forte vem antes da RAM, salvo prova direta de RAM (WHEA ou teste do Windows falhou).
+                bool diskFirst = (badSectors > 0 || ntfs55 > 0 || disk.Count >= Config.DiskRetryThreshold) && memTest == 0 && whea == 0;
+                if (diskFirst) { parts.AddRange(diskParts); acts.AddRange(diskActs); parts.AddRange(ramParts); acts.AddRange(ramActs); }
+                else { parts.AddRange(ramParts); acts.AddRange(ramActs); parts.AddRange(diskParts); acts.AddRange(diskActs); }
                 if (powerLoss > 0) { parts.Add(powerLoss + " queda(s) de energia"); acts.Add("verificar energia/no-break/fonte"); }
                 if (parts.Count > 0)
                 {

@@ -230,6 +230,16 @@ namespace DiagBIG.Core
             return sb.ToString();
         }
 
+        public static string BuildActionPlan(ReportData d)
+        {
+            if (d.ActionPlan.Count == 0) return "";
+            var sb = new StringBuilder();
+            Title(sb, "O QUE FAZER (PASSO A PASSO)");
+            foreach (string line in d.ActionPlan) sb.Append("  ").Append(line).Append(NL);
+            sb.Append(NL);
+            return sb.ToString();
+        }
+
         public static string BuildHypotheses(ReportData d)
         {
             var sb = new StringBuilder();
@@ -286,8 +296,8 @@ namespace DiagBIG.Core
                     sb.Append("          ex.: ").Append(OneLine(g.Sample, 110)).Append(NL);
             }
 
-            var latest = Grouping.Latest(b.Occurrences, Config.DetailedOccurrences);
-            sb.Append(NL).Append("  ÚLTIMAS ").Append(latest.Count).Append(latest.Count == 1 ? " OCORRÊNCIA" : " OCORRÊNCIAS").Append(" (mais recente primeiro)").Append(NL);
+            var latest = Grouping.LatestWithTypes(b.Occurrences, Config.DetailedOccurrences, 10);
+            sb.Append(NL).Append("  ÚLTIMAS ").Append(latest.Count).Append(latest.Count == 1 ? " OCORRÊNCIA" : " OCORRÊNCIAS").Append(groups.Count > 1 ? " (mais recente primeiro; inclui a última de cada tipo)" : " (mais recente primeiro)").Append(NL);
             foreach (Occurrence o in latest)
             {
                 sb.Append("[").Append(DateTimeLong(o.Time)).Append("] ");
@@ -315,13 +325,13 @@ namespace DiagBIG.Core
 
         public static string BuildFull(ReportData d)
         {
-            return BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildHypotheses(d) + BuildSections(d);
+            return BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildActionPlan(d) + BuildHypotheses(d) + BuildSections(d);
         }
 
         /// <summary>Cabeçalho + resumo, cortado em no máximo maxChars (para colar no caso).</summary>
         public static string BuildResumo(ReportData d, int maxChars = Config.ResumoMaxChars)
         {
-            return Truncate((BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildHypotheses(d)).TrimEnd() + NL, maxChars);
+            return Truncate((BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildActionPlan(d) + BuildHypotheses(d)).TrimEnd() + NL, maxChars);
         }
 
         public static string Truncate(string text, int maxChars)
