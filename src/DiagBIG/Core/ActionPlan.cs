@@ -132,7 +132,7 @@ namespace DiagBIG.Core
                 if (ramSuspect)
                     plan.Add(step("Há sinal de RAM com defeito (tela azul de memória/WHEA/teste do Windows): testar a RAM (MemTest86 ou MemTest86+ em pen drive, várias passadas, pente a pente) ANTES de pôr o servidor em produção; senão corrompe de novo."));
                 else
-                    plan.Add(step("Testar a RAM de qualquer jeito (MemTest86+ em pen drive ou mdsched.exe > Estendido) antes de pôr em produção: disco e RAM ruins aparecem juntos."));
+                    plan.Add(step("Testar a RAM de qualquer jeito (MemTest86+ em pen drive ou o botão Testar memória (mdsched) > Estendido) antes de pôr em produção: disco e RAM ruins aparecem juntos."));
             }
             else
             {
@@ -147,7 +147,7 @@ namespace DiagBIG.Core
                                   "N2: subir o banco com innodb_force_recovery=1 ou 2 (no máximo 2), reparar ou recriar as tabelas com erro (OPTIMIZE, REPAIR TABLE ou DROP e recriar) e reparar o Windows com DISM + SFC. " +
                                   "Se não der certo, ou se precisar de force 3 ou mais: EQUIPE TÉCNICA (dump, reinstalação ou troca de servidor)."));
                 if (ramSuspect)
-                    plan.Add(step("RAM primeiro: testar com MemTest86/MemTest86+ (pen drive, várias passadas, pente a pente) ou mdsched.exe > Estendido. Reparar Windows ou banco com RAM defeituosa não adianta: volta a corromper."));
+                    plan.Add(step("RAM primeiro: testar com MemTest86/MemTest86+ (pen drive, várias passadas, pente a pente) ou o botão Testar memória (mdsched) > Estendido. Reparar Windows ou banco com RAM defeituosa não adianta: volta a corromper."));
                 plan.Add(step("chkdsk C: /scan (e D: se o banco estiver lá); se achar erro, chkdsk /f na janela de manutenção. Se o chkdsk achar setor ruim ou voltar com erro, mudar para a rota de TROCAR O DISCO."));
                 if (dismFailed)
                     plan.Add(step("O DISM já falhou aqui (" + string.Join(", ", repairCodes.ToArray()) + ") e os logs não mostram defeito de disco. Tentar UMA vez com origem local: montar o ISO da MESMA versão/build do Windows e rodar " +

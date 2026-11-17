@@ -23,6 +23,7 @@ namespace DiagBIG.UI
         readonly Button openTxt = new Button();
         readonly Button openFolder = new Button();
         readonly Button chkdsk = new Button();
+        readonly Button memtest = new Button();
         readonly Label copied = new Label();
         readonly System.Windows.Forms.Timer copiedTimer = new System.Windows.Forms.Timer();
 
@@ -77,7 +78,8 @@ namespace DiagBIG.UI
             Setup(openTxt, "Abrir TXT", (s, e) => OpenTxt());
             Setup(openFolder, "Abrir pasta", (s, e) => OpenFolder());
             Setup(chkdsk, "Verificar disco (chkdsk /scan)", (s, e) => RunChkdsk());
-            bottom.Controls.AddRange(new Control[] { copyAll, copySummary, openTxt, openFolder, chkdsk });
+            Setup(memtest, "Testar memória (mdsched)", (s, e) => RunMemTest());
+            bottom.Controls.AddRange(new Control[] { copyAll, copySummary, openTxt, openFolder, chkdsk, memtest });
             copied.Text = "Copiado!";
             copied.AutoSize = true;
             copied.ForeColor = Color.DarkGreen;
@@ -134,7 +136,7 @@ namespace DiagBIG.UI
         void SetBusy(bool busy)
         {
             running = busy;
-            collect.Enabled = period.Enabled = chkdsk.Enabled = !busy;
+            collect.Enabled = period.Enabled = chkdsk.Enabled = memtest.Enabled = !busy;
             copyAll.Enabled = copySummary.Enabled = !busy && last != null;
             openTxt.Enabled = openFolder.Enabled = !busy && last != null && last.SavedPath != null;
             UseWaitCursor = busy;
@@ -226,6 +228,21 @@ namespace DiagBIG.UI
             try { dir = last != null && last.SavedPath != null ? Path.GetDirectoryName(last.SavedPath) : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory); }
             catch (Exception) { dir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory); }
             using (var f = new ChkdskForm(Icon, dir, last != null && last.Data != null ? last.Data.ComputerName : SystemInfo.HostName())) f.ShowDialog(this);
+        }
+
+        void RunMemTest()
+        {
+            if (running) return;
+            if (MessageBox.Show(this,
+                    "O teste de memória do Windows (mdsched) só roda ANTES do Windows iniciar: o computador precisa REINICIAR.\r\n\r\n" +
+                    "• Se for um servidor em uso, combine antes: ele ficará fora do ar durante o teste (de 15 min a algumas horas no modo Estendido).\r\n" +
+                    "• Salve o trabalho e avise os usuários.\r\n" +
+                    "• Na janela seguinte, escolha \"Reiniciar agora\" ou \"na próxima inicialização\". Para pentes suspeitos, use F1 na tela do teste e escolha Estendido.\r\n" +
+                    "• Depois que o Windows voltar, abra o DiagBIG de novo: o relatório mostra o resultado em MEMÓRIA RAM E HARDWARE.\r\n\r\n" +
+                    "Abrir o teste de memória agora?", "DiagBIG", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            try { Process.Start(new ProcessStartInfo("mdsched.exe") { UseShellExecute = true }); }
+            catch (Exception ex) { MessageBox.Show(this, "Não consegui abrir o mdsched.exe (rodar como administrador): " + ex.Message, "DiagBIG", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
 
         void OpenTxt()

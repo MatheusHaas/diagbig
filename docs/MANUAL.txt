@@ -149,6 +149,13 @@ BOTÃO VERIFICAR DISCO (chkdsk /scan)
   relatório já indica disco com defeito grave, pede confirmação: ler o disco
   inteiro pode piorar. chkdsk /f e /r continuam manuais, depois do backup.
 
+BOTÃO TESTAR MEMÓRIA (mdsched)
+  Abre o Diagnóstico de Memória do Windows. O teste só roda antes do Windows
+  iniciar, então o PC REINICIA (servidor em uso: combinar a parada antes). Na tela
+  do teste, F1 e Estendido para pente suspeito. Ao voltar, abrir o DiagBIG: em
+  MEMÓRIA RAM E HARDWARE a linha "Último teste de memória do Windows" mostra a data
+  e se achou erro (padrão curto não descarta pente ruim; MemTest86 é mais forte).
+
 O QUE FAZER (PASSO A PASSO)
   Vem depois de ONDE ESTÁ O PROBLEMA. Duas rotas:
   - Disco com defeito grave (setor defeituoso, NTFS 55/98, SMART em atenção ou

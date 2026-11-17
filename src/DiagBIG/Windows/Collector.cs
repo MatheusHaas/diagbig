@@ -155,7 +155,20 @@ namespace DiagBIG.Windows
             try { hw.Info.InsertRange(0, Memory.Describe(SystemInfo.MemoryModules())); }
             catch (Exception ex) { hw.Info.Insert(0, "Pentes de RAM indisponíveis: " + ex.Message); }
             hw.Info.Add("WHEA = erro de hardware (RAM, CPU, PCIe); Resource-Exhaustion 2004 = pouca memória virtual.");
-            hw.Info.Add("O Windows só registra o teste de memória se ele rodou: se nunca rodou, executar mdsched.exe ou MemTest86.");
+            hw.Info.Add("O Windows só registra o teste de memória se ele rodou: se nunca rodou, executar mdsched.exe ou MemTest86 (botão Testar memória).");
+            try
+            {
+                bool cap2;
+                var last = EventLogs.Query("System", "*[System[Provider[@Name='" + Config.MemDiagProvider + "'] and (EventID=" + Config.MemDiagOkId + " or EventID=" + Config.MemDiagErrorId + ")]]", null, out cap2);
+                if (last.Count == 0) hw.Info.Add("Último teste de memória do Windows: NUNCA RODOU neste log (use o botão Testar memória).");
+                else
+                {
+                    Occurrence o = last[0];
+                    string when = o.Time.HasValue ? o.Time.Value.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture) : "?";
+                    hw.Info.Add("Último teste de memória do Windows: " + when + " — " + (o.EventId == Config.MemDiagErrorId.ToString() ? "ERROS DE HARDWARE DETECTADOS (trocar/testar pente a pente)" : "sem erros (o modo padrão é curto; não descarta pente ruim)"));
+                }
+            }
+            catch (Exception) { }
             hwSection.Blocks.Add(hw);
             d.Summary.Add(ReportBuilder.Summarize("MEMÓRIA/HARDWARE", new[] { hw }));
             d.Sections.Add(hwSection);

@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.6.3";
+        public const string Version = "1.6.4";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -62,6 +62,8 @@ namespace DiagBIG.Core
         /// <summary>Resultado do Diagnóstico de Memória do Windows (mdsched). 1102 = erros de hardware detectados.</summary>
         public const string MemDiagProvider = "Microsoft-Windows-MemoryDiagnostics-Results";
         public const int MemDiagErrorId = 1102;
+        /// <summary>1101 = o teste de memória rodou e não achou erros.</summary>
+        public const int MemDiagOkId = 1101;
         /// <summary>Resource-Exhaustion-Detector 2004: pouca memória virtual.</summary>
         public const string ResourceExhaustionProvider = "Microsoft-Windows-Resource-Exhaustion-Detector";
         public const int ResourceExhaustionId = 2004;
