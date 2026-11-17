@@ -128,6 +128,13 @@ Amostras (pasta amostras\)
 - my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.
 
 
+N) Novidades da 1.6.3 (conferir na VM / cliente real)
+   - Logo depois do título aparece "PARA O N1: O QUE FAZER AGORA" com UMA ação: acionar N2 (force até 2 + reparar/recriar tabela + DISM/SFC),
+     equipe técnica (reinstalar no mesmo terminal) ou equipe técnica (trocar servidor/disco). N2 não faz dump nem restauração.
+   - Eventos repetidos saem agrupados: um erro por linha com a contagem e os HORÁRIOS (por dia; até 12 mais recentes). Sumiu "ÚLTIMAS 30".
+   - Seção REINÍCIOS E DESLIGAMENTOS: "LIGA/DESLIGA AGRUPADO" (ligou/desligou/suspensão com horários); inesperados e tela azul só no bloco acima.
+   - .err só com tabela crashed: N1 = acionar N2; com Write-EventLog -Source disk -EventId 7 ... = trocar servidor/disco.
+
 N) Novidades da 1.6.2 (conferir na VM)
    - Nome do PC com 16+ caracteres (ex.: SERVIDOR-CENTRAL): PC e ARQUIVO mostram o nome inteiro (antes cortava em 15) e o .err é achado
      sem o AVISO falso de "SERVIDOR-CENTRA.err não existe".

@@ -114,6 +114,8 @@ namespace DiagBIG.Core
         public List<DiagItem> Diagnosis { get; } = new List<DiagItem>();
         /// <summary>O que fazer, passo a passo (calculado por ActionPlan): primeira linha é o veredito.</summary>
         public List<string> ActionPlan { get; } = new List<string>();
+        /// <summary>Encaminhamento simples para o N1, no início do relatório (calculado por ActionPlan).</summary>
+        public List<string> N1 { get; } = new List<string>();
         /// <summary>true = algum serviço do banco está rodando agora; false = nenhum; null = sem serviço encontrado.</summary>
         public bool? DbServiceRunning { get; set; }
         public List<ReportSection> Sections { get; } = new List<ReportSection>();

@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.6.2";
+        public const string Version = "1.6.3";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -122,6 +122,8 @@ namespace DiagBIG.Core
 
         // ---------------- Saída ----------------
         public const int DetailedOccurrences = 30;
+        /// <summary>Máximo de horários listados por tipo de ocorrência repetida (os mais recentes).</summary>
+        public const int MaxTimesPerGroup = 12;
         public const int ResumoMaxChars = 3500;
         public const int MaxEventsPerQuery = 20000;
         /// <summary>Pasta (ao lado do .exe ou na Área de Trabalho) onde os TXT são gravados.</summary>

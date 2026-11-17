@@ -128,6 +128,13 @@ namespace DiagBIG.Core
             sb.Append("  DIAGBIG v").Append(Config.Version).Append(Dash).Append("LOGS DE DISCO E BANCO PARA O SUPORTE").Append(NL);
             sb.Append(Sep).Append(NL).Append(NL);
 
+            if (d.N1.Count > 0)
+            {
+                Title(sb, "PARA O N1: O QUE FAZER AGORA");
+                foreach (string l in d.N1) AppendWrapped(sb, l, "  ");
+                sb.Append(NL).Append("  Detalhes técnicos abaixo.").Append(NL).Append(NL);
+            }
+
             Title(sb, "IDENTIFICAÇÃO");
             sb.Append("  PC ............: ").Append(d.ComputerName).Append(NL);
             sb.Append("  WINDOWS .......: ").Append(d.WindowsVersion).Append(NL);
@@ -223,7 +230,7 @@ namespace DiagBIG.Core
             foreach (DiagItem it in d.Diagnosis)
             {
                 sb.Append("  [").Append(VerdictText(it.Verdict)).Append("] ").Append(it.Area).Append(NL);
-                sb.Append("      ").Append(it.Evidence).Append(NL);
+                sb.Append("      ").Append(it.Evidence.Replace("\n", NL)).Append(NL);
                 if (it.Verdict != DiagVerdict.SemIndicio && !string.IsNullOrEmpty(it.Action)) sb.Append("      O que fazer: ").Append(it.Action).Append(NL);
             }
             sb.Append(NL);
@@ -247,7 +254,7 @@ namespace DiagBIG.Core
             if (d.Hypotheses.Count == 0) sb.Append("  Nenhum indício forte de causa nos logs lidos.").Append(NL);
             else sb.Append("  Qualquer uma das causas abaixo pode ser a origem; nenhuma está confirmada. Descartar uma por vez.").Append(NL);
             int n = 0;
-            foreach (string h in d.Hypotheses) sb.Append("  ").Append(++n).Append(". ").Append(h).Append(NL);
+            foreach (string h in d.Hypotheses) sb.Append("  ").Append(++n).Append(". ").Append(h.Replace("\n", NL)).Append(NL);
             sb.Append(NL);
             return sb.ToString();
         }
@@ -286,36 +293,52 @@ namespace DiagBIG.Core
                 return;
             }
 
-            var groups = Grouping.Group(b.Occurrences);
-            sb.Append(NL).Append("  AGRUPAMENTO (").Append(b.Occurrences.Count).Append(" no total, ").Append(groups.Count).Append(groups.Count == 1 ? " tipo)" : " tipos)").Append(NL);
+            var occs = b.Occurrences;
+            int merged = 0;
+            if (b.Tag == BlockTag.Power)
+            {
+                occs = PowerEvents.MergeUnexpected(b.Occurrences);
+                merged = b.Occurrences.Count - occs.Count;
+            }
+            var groups = Grouping.Group(occs);
+            sb.Append(NL).Append("  AGRUPAMENTO (").Append(occs.Count).Append(" no total, ").Append(groups.Count).Append(groups.Count == 1 ? " tipo)" : " tipos)").Append(NL);
             foreach (OccurrenceGroup g in groups)
             {
-                sb.Append(string.Format(CultureInfo.InvariantCulture, "  {0,5}x  ", g.Count)).Append(g.Key).Append(NL);
-                sb.Append("          primeira: ").Append(DateTimeShort(g.First)).Append("   última: ").Append(DateTimeShort(g.Last)).Append(NL);
-                if (b.IsEvents)
-                    sb.Append("          ex.: ").Append(OneLine(g.Sample, 110)).Append(NL);
-            }
-
-            var latest = Grouping.LatestWithTypes(b.Occurrences, Config.DetailedOccurrences, 10);
-            sb.Append(NL).Append("  ÚLTIMAS ").Append(latest.Count).Append(latest.Count == 1 ? " OCORRÊNCIA" : " OCORRÊNCIAS").Append(groups.Count > 1 ? " (mais recente primeiro; inclui a última de cada tipo)" : " (mais recente primeiro)").Append(NL);
-            foreach (Occurrence o in latest)
-            {
-                sb.Append("[").Append(DateTimeLong(o.Time)).Append("] ");
+                var items = occs.Where(o => string.Equals(o.GroupKey ?? "", g.Key, StringComparison.OrdinalIgnoreCase)).ToList();
+                string title = g.Key + (merged > 0 && g.Key.StartsWith("Kernel-Power 41", StringComparison.OrdinalIgnoreCase) ? " + EventLog 6008 (mesmo incidente; " + merged + " repetido(s) juntado(s))" : "");
+                sb.Append(string.Format(CultureInfo.InvariantCulture, "  {0,5}x  ", g.Count)).Append(title).Append(NL);
+                AppendWrapped(sb, "horários: " + Grouping.TimesText(items.Select(o => o.Time), Config.MaxTimesPerGroup), "          ");
                 if (b.IsEvents)
                 {
-                    sb.Append(o.Source);
-                    if (!string.IsNullOrEmpty(o.EventId)) sb.Append(" ID ").Append(o.EventId);
-                    if (!string.IsNullOrEmpty(o.Level)) sb.Append(" (").Append(o.Level).Append(')');
+                    Occurrence rep = Grouping.Latest(items, 1).First();
+                    AppendWrapped(sb, "ex.: " + OneLine(rep.Message, 220), "          ");
                 }
                 else
                 {
-                    sb.Append("encontrado: \"").Append(o.SummaryKey).Append('"');
+                    Occurrence rep = Grouping.Latest(items, 1).First();
+                    var lines = SplitLines(rep.Message).Take(6).ToList();
+                    for (int i = 0; i < lines.Count; i++)
+                        sb.Append("          ").Append(i == 0 ? "ex.: " : "     ").Append(lines[i].Length > 150 ? lines[i].Substring(0, 147) + "..." : lines[i]).Append(NL);
                 }
-                sb.Append(NL);
-                foreach (string line in SplitLines(o.Message))
-                    sb.Append("    ").Append(line).Append(NL);
             }
             sb.Append(NL);
+        }
+
+        /// <summary>Quebra o texto em linhas de até ~78 colunas, com recuo.</summary>
+        public static void AppendWrapped(StringBuilder sb, string text, string indent, int width = 78)
+        {
+            var line = new StringBuilder();
+            foreach (string w in text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (line.Length > 0 && indent.Length + line.Length + 1 + w.Length > width)
+                {
+                    sb.Append(indent).Append(line).Append(NL);
+                    line.Clear();
+                }
+                if (line.Length > 0) line.Append(' ');
+                line.Append(w);
+            }
+            if (line.Length > 0) sb.Append(indent).Append(line).Append(NL);
         }
 
         static void Title(StringBuilder sb, string title)

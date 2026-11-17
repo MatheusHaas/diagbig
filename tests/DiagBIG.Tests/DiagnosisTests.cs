@@ -63,7 +63,7 @@ namespace DiagBIG.Tests
                 Err("[ERROR] InnoDB: Database page corruption on disk or a failed file read of tablespace ibdata1 page [page id: space=0, page number=7]"),
                 Err("[ERROR] InnoDB: The log sequence number 123 in the future")));
             Assert.Equal(DiagVerdict.Provavel, Item(d, "ARQUIVOS").Verdict);
-            Assert.Contains("reinstalar", Item(d, "ARQUIVOS").Action);
+            Assert.Contains("equipe técnica", Item(d, "ARQUIVOS").Action);
         }
 
         [Fact]

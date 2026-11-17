@@ -217,7 +217,7 @@ namespace DiagBIG.Core
                            "disco (chkdsk) e desligamentos forçados; checar a versão do MariaDB/MySQL.");
             if (dbCrashes >= Config.CrashLoopThreshold)
                 result.Add("Banco em LOOP DE CRASH (" + dbCrashes + " quedas no período): o serviço cai e reinicia sozinho. " +
-                           "Parar o serviço, tirar cópia da pasta data e só então recuperar (innodb_force_recovery + dump, ou backup). Não deixar o sistema gravando nele.");
+                           "Tentar subir com innodb_force_recovery=1 ou 2, somente, com a porta 3307 para manutenção; se não resolver, acionar a equipe técnica. Não deixar o sistema gravando nele.");
 
             // 5a) banco que não sobe: InnoDB aborta na inicialização (vai para o topo da lista)
             var dbAll = dbLines.Concat(Occ(d, BlockTag.DbEvents)).ToList();
@@ -227,18 +227,16 @@ namespace DiagBIG.Core
                 List<string> tables = CorruptTables(dbAll);
                 string loop = startupFails >= Config.CrashLoopThreshold ? ", em LOOP: o serviço tenta subir e cai sem parar" : "";
                 string tabs = tables.Count == 0 ? "" :
-                    " Tabelas com página corrompida: " + string.Join(", ", tables.Take(10).ToArray()) + (tables.Count > 10 ? " e mais " + (tables.Count - 10) : "") + ".";
+                    " Tabelas com página corrompida:" + Diagnosis.TableLines(tables, 15, "       ") + "\n      ";
                 if (d.DbServiceRunning == true)
                     result.Insert(0, "BANCO FALHOU AO SUBIR " + startupFails + " vez(es) (o InnoDB abortou na inicialização) e AGORA O SERVIÇO ESTÁ RODANDO" +
                                      (ForceRecoveryOn(d) ? " em modo de recuperação (innodb_force_recovery no my.ini): o banco só lê, não grava" : "") + "." + tabs +
-                                     " Tirar o dump AGORA, com a porta trocada para o sistema do cliente não conectar; depois parar, remover a opção de recuperação e restaurar o dump num banco novo (datadir limpo). " +
-                                     "Se o sistema voltou a gravar sem dump feito, o dano pode ter piorado. A causa da corrupção (energia, RAM, disco) precisa ser tratada, senão volta.");
+                                     " Salvar o que der em OUTRO disco usando a porta 3307 para manutenção (o sistema do cliente não pode gravar). " +
+                                     "Force somente 1 ou 2; se precisar de mais, acionar a equipe técnica. A causa da corrupção (energia, RAM, disco) precisa ser tratada, senão volta.");
                 else
-                result.Insert(0, "BANCO NÃO SOBE: o InnoDB aborta na inicialização (" + startupFails + " tentativa(s) falhou" + loop + ")." + tabs +
-                                 " Procedimento: parar o serviço e copiar a pasta data ANTES de mexer; no my.ini, em [mysqld], pôr innodb_force_recovery=1 e subir o serviço " +
-                                 "(se não subir, aumentar de 1 em 1, até 3; 4 ou mais pode perder dados); com o banco no ar, tirar o dump, parar, remover a opção e restaurar do dump ou do backup. " +
-                                 (tables.Count > 0 ? "Conferir se as tabelas corrompidas são de dados importantes ou recriáveis (ex.: fila/temporárias); as recriáveis podem ser descartadas e recriadas. " : "") +
-                                 "Não deixar o sistema gravando no banco durante o procedimento. A causa da corrupção (energia, RAM, disco) precisa ser tratada, senão volta.");
+                    result.Insert(0, "BANCO NÃO SOBE: o InnoDB aborta na inicialização (" + startupFails + " tentativa(s) falhou" + loop + ")." + tabs +
+                                     " Tentar subir com innodb_force_recovery=1 ou 2, somente, com a porta 3307 para manutenção, e salvar o que der em OUTRO disco. " +
+                                     "Se não subir, acionar a equipe técnica. A causa da corrupção (energia, RAM, disco) precisa ser tratada, senão volta.");
             }
 
             // 5b) erro de memória no banco: procedimento de reinstalação

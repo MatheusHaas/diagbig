@@ -68,6 +68,38 @@ namespace DiagBIG.Core
             return "sem tela azul e sem botão de energia: provável QUEDA/CORTE DE ENERGIA, reset ou travamento total";
         }
 
+        static bool IsKp41(Occurrence o) { return Is(o.Source, Config.KernelPowerProvider) && o.EventId == Config.KernelPowerId.ToString(CultureInfo.InvariantCulture); }
+        static bool Is6008(Occurrence o) { return Is(o.Source, Config.EventLogProvider) && o.EventId == Config.UnexpectedShutdownId.ToString(CultureInfo.InvariantCulture); }
+
+        /// <summary>Eventos EventLog 6008 que têm um Kernel-Power 41 até 5 min de distância: são o mesmo incidente.</summary>
+        public static bool IsDuplicate6008(Occurrence o, IList<Occurrence> all)
+        {
+            if (!Is6008(o) || o.Time == null) return false;
+            return all.Any(k => IsKp41(k) && k.Time != null && Math.Abs((k.Time.Value - o.Time.Value).TotalMinutes) <= 5);
+        }
+
+        /// <summary>Lista sem os 6008 que repetem um Kernel-Power 41.</summary>
+        public static List<Occurrence> MergeUnexpected(IEnumerable<Occurrence> events)
+        {
+            var all = events.ToList();
+            return all.Where(o => !IsDuplicate6008(o, all)).ToList();
+        }
+
+        /// <summary>Incidentes de desligamento inesperado (6008, Kernel-Power 41 e tela azul no mesmo momento contam 1).</summary>
+        public static int UnexpectedIncidents(IEnumerable<Occurrence> events)
+        {
+            var times = events.Where(o => IsUnexpected(Classify(o.Source, o.EventId))).Select(o => o.Time).ToList();
+            int semData = times.Count(t => t == null);
+            int n = semData;
+            DateTime? last = null;
+            foreach (DateTime t in times.Where(x => x != null).Select(x => x.Value).OrderBy(x => x))
+            {
+                if (last == null || (t - last.Value).TotalMinutes > 5) n++;
+                last = t;
+            }
+            return n;
+        }
+
         /// <summary>Linhas da linha do tempo, mais recente primeiro.</summary>
         public static List<string> Timeline(IEnumerable<Occurrence> events, int max)
         {
@@ -79,6 +111,29 @@ namespace DiagBIG.Core
                 lines.Add(string.Format(CultureInfo.InvariantCulture, "  {0}  {1,-30} {2} {3}",
                     ReportBuilder.DateTimeLong(o.Time), Label(k), Grouping.ShortSource(o.Source), o.EventId) +
                     (detail.Length > 0 ? ReportBuilder.NL + "                         " + detail : ""));
+            }
+            return lines;
+        }
+
+        /// <summary>
+        /// Linha do tempo enxuta: eventos repetidos viram uma linha com a lista de horários.
+        /// Desligamentos inesperados e telas azuis ficam de fora (já estão no bloco de desligamentos inesperados).
+        /// </summary>
+        public static List<string> TimelineGrouped(IEnumerable<Occurrence> events)
+        {
+            var lines = new List<string>();
+            var groups = events
+                .Select(o => new { o, k = Classify(o.Source, o.EventId) })
+                .Where(x => !IsUnexpected(x.k))
+                .GroupBy(x => new { x.k, Src = Grouping.ShortSource(x.o.Source), Id = x.o.EventId, Det = x.k == PowerKind.Requested ? "" : Detail(x.k, x.o.Message) })
+                .OrderByDescending(g => g.Max(x => x.o.Time ?? DateTime.MinValue));
+            foreach (var g in groups)
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.Append(string.Format(CultureInfo.InvariantCulture, "  {0,4}x  {1} ({2} {3})", g.Count(), Label(g.Key.k), g.Key.Src, g.Key.Id)).Append(ReportBuilder.NL);
+                if (g.Key.Det.Length > 0) ReportBuilder.AppendWrapped(sb, g.Key.Det, "          ");
+                ReportBuilder.AppendWrapped(sb, "horários: " + Grouping.TimesText(g.Select(x => x.o.Time), Config.MaxTimesPerGroup), "          ");
+                lines.Add(sb.ToString().TrimEnd('\r', '\n'));
             }
             return lines;
         }

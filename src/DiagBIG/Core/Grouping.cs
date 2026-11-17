@@ -43,6 +43,28 @@ namespace DiagBIG.Core
                 .ToList();
         }
 
+        /// <summary>
+        /// Horários agrupados por dia, do mais antigo para o mais recente: "10/11: 14:32, 14:40; 11/11: 09:01".
+        /// Mostra só os maxShown mais recentes e diz quantos ficaram de fora.
+        /// </summary>
+        public static string TimesText(IEnumerable<DateTime?> times, int maxShown)
+        {
+            var t = times.Where(x => x.HasValue).Select(x => x.Value).OrderBy(x => x).ToList();
+            if (t.Count == 0) return "(sem horário)";
+            // Mesmo minuto vira "13:22 (12x)".
+            var minutes = t.GroupBy(x => new DateTime(x.Year, x.Month, x.Day, x.Hour, x.Minute, 0)).OrderBy(g => g.Key).ToList();
+            int skippedMin = Math.Max(0, minutes.Count - Math.Max(maxShown, 1));
+            int skipped = minutes.Take(skippedMin).Sum(g => g.Count());
+            var shown = minutes.Skip(skippedMin).ToList();
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string days = string.Join("; ", shown.GroupBy(g => g.Key.Date).Select(dg =>
+                dg.Key.ToString("dd/MM", inv) + " " +
+                string.Join(", ", dg.Select(g => g.Key.ToString("HH:mm", inv) + (g.Count() > 1 ? " (" + g.Count() + "x)" : "")).ToArray())).ToArray());
+            return skipped > 0
+                ? "(+" + skipped + " antes, desde " + t[0].ToString("dd/MM HH:mm", inv) + ") " + days
+                : days;
+        }
+
         /// <summary>Mais recentes primeiro; sem data vão para o fim.</summary>
         public static List<Occurrence> Latest(IEnumerable<Occurrence> items, int max)
         {

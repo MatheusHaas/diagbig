@@ -119,9 +119,11 @@ namespace DiagBIG.Tests
             Assert.Contains("Nenhuma ocorrência encontrada no período.", txt);
             Assert.Contains("NÃO VERIFICADO: nenhum serviço encontrado", txt);
             Assert.Contains("   40x  disk 7", txt);
-            Assert.Contains("ÚLTIMAS 30 OCORRÊNCIAS", txt);
-            Assert.Contains("msg 39", txt);       // mais recente aparece
-            Assert.DoesNotContain("msg 9\r\n", txt); // 10 mais antigas ficam só no agrupamento
+            Assert.DoesNotContain("ÚLTIMAS", txt);
+            Assert.Contains("horários:", txt);
+            Assert.Contains("(+28 antes, desde", txt); // 40 ocorrências, só os 12 horários mais recentes
+            Assert.Contains("msg 39", txt);       // exemplo = a mais recente
+            Assert.DoesNotContain("msg 9\r\n", txt);
             Assert.DoesNotContain("\n", txt.Replace("\r\n", ""));
         }
 

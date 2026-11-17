@@ -172,7 +172,8 @@ namespace DiagBIG.Tests
             Assert.Contains("gerente.comunicacao_fila_filial_009", h[0]);
             Assert.Contains("gerente.comunicacao_fila_filial_028", h[0]);
             Assert.Contains("innodb_force_recovery=1", h[0]);
-            Assert.Contains("copiar a pasta data ANTES", h[0]);
+            Assert.Contains("porta 3307", h[0]);
+            Assert.DoesNotContain("até 3", h[0]);
             Assert.Equal(6, Hypotheses.StartupFailures(lines, null));
         }
 
@@ -319,6 +320,18 @@ namespace DiagBIG.Tests
         }
 
         [Fact]
+        public void N1_OnlyTables_SaysN2ForceRecoveryUpTo2()
+        {
+            var d = Data(Block(BlockTag.Db, false, DbLine("Table './loja/vendas' is marked as crashed and should be repaired", "marked as crashed")));
+            d.Diagnosis.AddRange(Diagnosis.Analyze(d));
+            var n1 = new List<string>();
+            ActionPlan.Build(d, n1);
+            Assert.Contains("Acione o N2 para tratar as tabelas", n1[0]);
+            Assert.Equal("- loja.vendas", n1[1]);
+                        Assert.Contains("Em caso de não sucesso, acionar equipe técnica", string.Join(" ", n1));
+        }
+
+        [Fact]
         public void ActionPlan_NoFatalDisk_TriesChkdskDismSfcThenReinstall()
         {
             var d = Data(Block(BlockTag.Power, true, Kp41(0x1A)),
@@ -330,6 +343,16 @@ namespace DiagBIG.Tests
             int reinst = plan.FindIndex(x => x.Contains("reinstalar o Windows"));
             Assert.True(chk > 0 && chk < dism && dism < reinst);
             Assert.Contains(plan, x => x.Contains("RAM primeiro"));
+        }
+
+        [Fact]
+        public void N1_FatalDisk_SaysReplaceServer()
+        {
+            var d = Data(Block(BlockTag.Disk, true, Ev("disk", 7, "The device, \\Device\\Harddisk0\\DR0, has a bad block.")));
+            var n1 = new List<string>();
+            ActionPlan.Build(d, n1);
+            Assert.Contains("equipe técnica", n1[0]);
+            Assert.Contains("TROCAR O SERVIDOR/DISCO", n1[0]);
         }
 
         [Fact]

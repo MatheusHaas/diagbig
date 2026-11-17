@@ -93,6 +93,14 @@ namespace DiagBIG.Core
             return Blocks(d, tag).SelectMany(b => b.Occurrences).ToList();
         }
 
+        /// <summary>Uma tabela por linha ("\n" vira quebra de linha no relatório).</summary>
+        public static string TableLines(IEnumerable<string> items, int max, string indent)
+        {
+            var l = items.ToList();
+            string r = string.Concat(l.Take(max).Select(t => "\n" + indent + "- " + t).ToArray());
+            return r + (l.Count > max ? "\n" + indent + "... e mais " + (l.Count - max) : "");
+        }
+
         static string Join(IEnumerable<string> items, int max)
         {
             var l = items.ToList();
@@ -124,7 +132,7 @@ namespace DiagBIG.Core
             int ntfs55 = disk.Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && o.EventId == "55");
             bool smartBad = d.Summary.Any(s => s.Label == "SMART" && s.Status == CheckStatus.Atencao);
             int powerLoss = power.Count(o => PowerEvents.Classify(o.Source, o.EventId) == PowerKind.Unexpected && (o.Message ?? "").Contains("QUEDA/CORTE DE ENERGIA"));
-            int unexpected = power.Count(o => PowerEvents.IsUnexpected(PowerEvents.Classify(o.Source, o.EventId)));
+            int unexpected = PowerEvents.UnexpectedIncidents(power);
 
             // ---------- evidências do banco ----------
             List<string> tables = DamagedTables(all);
@@ -150,15 +158,15 @@ namespace DiagBIG.Core
                 if (tablesOnly)
                 {
                     it.Verdict = DiagVerdict.Provavel;
-                    it.Evidence = tables.Count + " tabela(s) com erro e nada indicando arquivos de sistema do banco: " + Join(tables, 10) + ".";
+                    it.Evidence = tables.Count + " tabela(s) com erro e nada indicando arquivos de sistema do banco:" + TableLines(tables, 15, "        ");
                     it.Action = "O problema parece restrito às tabelas citadas; NÃO precisa reinstalar nem trocar o servidor por isso. MyISAM: REPAIR TABLE (ou myisamchk). " +
-                                "InnoDB: dump da tabela (se necessário com innodb_force_recovery=1), DROP, recriar e restaurar; ou restaurar só ela do backup. Tirar cópia da pasta data antes.";
+                                "InnoDB: subir com innodb_force_recovery=1 ou 2, somente, na porta 3307 de manutenção, e recriar a tabela ou restaurá-la do backup. Se não resolver, equipe técnica.";
                     if (hwEvidence) it.Action += " Mas há indício de hardware abaixo: tratar a causa, senão outras tabelas corrompem.";
                 }
                 else if (tables.Count > 0)
                 {
                     it.Verdict = DiagVerdict.Possivel;
-                    it.Evidence = tables.Count + " tabela(s) citada(s) com erro (" + Join(tables, 10) + "), mas há também sinais mais amplos (veja as linhas abaixo).";
+                    it.Evidence = tables.Count + " tabela(s) citada(s) com erro, mas há também sinais mais amplos (veja as linhas abaixo):" + TableLines(tables, 15, "        ");
                     it.Action = "Não tratar só as tabelas: o dano é maior que elas.";
                 }
                 else if (tableCorrupt > 0)
@@ -178,14 +186,14 @@ namespace DiagBIG.Core
                 {
                     it.Verdict = DiagVerdict.Provavel;
                     it.Evidence = sysFile.Count + " linha(s) apontando para o tablespace de sistema, redo log ou dicionário, ex.: " + Short(sysFile[0]);
-                    it.Action = "Não é tabela: não adianta REPAIR/OPTIMIZE. Parar o serviço e copiar a pasta data; tentar innodb_force_recovery (1 a 3) para tirar o dump; " +
-                                "com o dump em mãos, reinstalar o MariaDB/MySQL (datadir novo) e restaurar. Sem dump possível, restaurar do backup.";
+                    it.Action = "Não é tabela: não adianta REPAIR/OPTIMIZE. Tentar salvar o que der em outro disco subindo com innodb_force_recovery=1 ou 2, somente, na porta 3307 de manutenção. " +
+                                "Reinstalar e restaurar é com a equipe técnica.";
                 }
                 else if (startupFails > 0)
                 {
                     it.Verdict = DiagVerdict.Possivel;
                     it.Evidence = (d.DbServiceRunning == true ? "O banco falhou ao subir (" + startupFails + " tentativa(s)) e agora está rodando " : "O banco não sobe (" + startupFails + " tentativa(s)) ") + (tables.Count > 0 ? "e há tabela corrompida citada: pode ser só ela." : "sem tabela citada: o dano pode estar nos arquivos de sistema do InnoDB.");
-                    it.Action = "Subir com innodb_force_recovery=1 (até 3) e tirar o dump; se subir assim, o dano é recuperável. Se só subir com 4 ou mais, é dano nos arquivos de sistema: reinstalar e restaurar do backup.";
+                    it.Action = "Subir com innodb_force_recovery=1 ou 2, somente, na porta 3307 de manutenção; se subir assim, o dano é recuperável. Se não subir, acionar a equipe técnica.";
                 }
                 else { it.Verdict = DiagVerdict.SemIndicio; it.Evidence = "Nada apontando para ibdata1/redo log/dicionário."; }
                 items.Add(it);
@@ -312,13 +320,13 @@ namespace DiagBIG.Core
             Func<string, DiagItem> by = a => items.FirstOrDefault(i => i.Area.StartsWith(a));
             DiagItem hw = by("HARDWARE"), win = by("WINDOWS"), tab = by("TABELA"), sys = by("ARQUIVOS"), mot = by("MOTOR"), esp = by("ESPAÇO");
             var parts = new List<string>();
-            if (hw != null && hw.Verdict == DiagVerdict.Provavel) parts.Add("HARDWARE com defeito (testar/trocar) antes de restaurar qualquer coisa");
+            if (hw != null && hw.Verdict == DiagVerdict.Provavel) parts.Add("HARDWARE com defeito");
             if (win != null && win.Verdict != DiagVerdict.SemIndicio) parts.Add("licença de avaliação do Windows (não é o banco)");
-            if (sys != null && sys.Verdict == DiagVerdict.Provavel) parts.Add("arquivos de sistema do banco danificados: dump + reinstalar + restaurar");
-            else if (mot != null && mot.Verdict == DiagVerdict.Provavel) parts.Add("motor do banco (bug/memória): reinstalar o MariaDB com dump e restore");
-            if (tab != null && tab.Verdict == DiagVerdict.Provavel && (sys == null || sys.Verdict != DiagVerdict.Provavel)) parts.Add("só tabela(s): recuperar/recriar as tabelas, sem reinstalar");
+            if (sys != null && sys.Verdict == DiagVerdict.Provavel) parts.Add("arquivos de sistema do banco danificados" + (hw != null && hw.Verdict == DiagVerdict.Provavel ? "" : ": acionar a equipe técnica (reinstalar)"));
+            else if (mot != null && mot.Verdict == DiagVerdict.Provavel) parts.Add("motor do banco (bug/memória): acionar a equipe técnica (reinstalar)");
+            if (tab != null && tab.Verdict == DiagVerdict.Provavel && (sys == null || sys.Verdict != DiagVerdict.Provavel)) parts.Add("só tabela(s): recuperar/recriar as tabelas, sem reinstalar" + (hw == null || hw.Verdict == DiagVerdict.SemIndicio ? " (N2 pode tentar: force_recovery até 2 + reparar/recriar a tabela + DISM/SFC, desde que sem erro de disco/RAM; senão equipe técnica)" : ""));
             if (esp != null && esp.Verdict == DiagVerdict.Provavel) parts.Add("espaço/E-S/arquivo bloqueado");
-            return parts.Count == 0 ? "Os logs lidos não separam a causa; veja as linhas abaixo e as CAUSAS PROVÁVEIS." : string.Join(" + ", parts.ToArray()) + ".";
+            return parts.Count == 0 ? "Os logs lidos não separam a causa; veja as linhas abaixo e as CAUSAS PROVÁVEIS." : string.Join(" + ", parts.ToArray()) + "." + (hw != null && hw.Verdict == DiagVerdict.Provavel ? " Tentar salvar o que tem no disco em outro disco ou acionar a equipe técnica." : "");
         }
     }
 }

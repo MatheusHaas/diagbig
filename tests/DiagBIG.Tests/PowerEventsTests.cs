@@ -55,5 +55,33 @@ namespace DiagBIG.Tests
             Assert.Contains("DESLIGAMENTO INESPERADO", lines[0] + lines[1] + lines[2]);
             Assert.Contains(lines, l => l.Contains("em nome do usuário LOJA\\caixa"));
         }
+
+        [Fact]
+        public void MergeUnexpected_Joins6008WithKernelPower41()
+        {
+            var t = new DateTime(2026, 11, 1, 8, 0, 0);
+            var ev = new System.Collections.Generic.List<Occurrence>
+            {
+                Ev("Microsoft-Windows-Kernel-Power", 41, t), Ev("EventLog", 6008, t.AddMinutes(1)),
+                Ev("EventLog", 6008, t.AddDays(1)),
+            };
+            Assert.Equal(2, PowerEvents.MergeUnexpected(ev).Count);
+            Assert.Equal(2, PowerEvents.UnexpectedIncidents(ev));
+        }
+
+        [Fact]
+        public void TimelineGrouped_CollapsesRepeatsWithTimes_AndSkipsUnexpected()
+        {
+            var t = new DateTime(2026, 11, 1, 8, 0, 0);
+            var ev = new System.Collections.Generic.List<Occurrence>
+            {
+                Ev("EventLog", 6005, t), Ev("EventLog", 6005, t.AddHours(5)), Ev("EventLog", 6005, t.AddDays(1)),
+                Ev("Microsoft-Windows-Kernel-Power", 41, t.AddDays(2)),
+            };
+            var lines = PowerEvents.TimelineGrouped(ev);
+            Assert.Single(lines);
+            Assert.Contains("3x  LIGOU", lines[0]);
+            Assert.Contains("01/11 08:00, 13:00; 02/11 08:00", lines[0]);
+        }
     }
 }

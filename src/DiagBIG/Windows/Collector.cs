@@ -118,7 +118,7 @@ namespace DiagBIG.Windows
             d.Summary.Add(ReportBuilder.Summarize("DESLIGAMENTOS INESPERADOS", new[] { shut }));
 
             try { d.LastBoot = SystemInfo.LastBoot(); } catch (Exception) { }
-            var timeline = new ReportBlock { Title = "LINHA DO TEMPO DE LIGA/DESLIGA (MAIS RECENTE PRIMEIRO)", InfoOnly = true };
+            var timeline = new ReportBlock { Title = "LIGA/DESLIGA AGRUPADO (MAIS RECENTE PRIMEIRO)", InfoOnly = true };
             if (power == null)
             {
                 timeline.Verified = false;
@@ -127,11 +127,10 @@ namespace DiagBIG.Windows
             }
             else
             {
-                List<string> lines = PowerEvents.Timeline(power, Config.PowerTimelineMax);
-                if (lines.Count == 0) timeline.Info.Add("Nenhum evento de liga/desliga no período.");
+                List<string> lines = PowerEvents.TimelineGrouped(power);
+                if (lines.Count == 0) timeline.Info.Add("Nenhum outro evento de liga/desliga no período.");
                 timeline.Info.AddRange(lines);
-                if (power.Count > Config.PowerTimelineMax)
-                    timeline.Info.Add("(mostrados os " + Config.PowerTimelineMax + " mais recentes de " + power.Count + ")");
+                timeline.Info.Add("(desligamentos inesperados e telas azuis: veja o bloco acima)");
                 timeline.Info.Add("");
                 timeline.Info.Add("Obs.: no Windows 8/10/11 com Inicialização Rápida, \"Desligar\" vira hibernação e não gera");
                 timeline.Info.Add("LIGOU/DESLIGOU CORRETAMENTE; aparecem SUSPENSÃO/VOLTOU. \"Reiniciar\" sempre gera.");
@@ -235,7 +234,7 @@ namespace DiagBIG.Windows
             d.DbServiceRunning = services.Count == 0 ? (bool?)null : services.Any(s => s.Status == "rodando");
             try { d.Hypotheses.AddRange(Hypotheses.Analyze(d)); } catch (Exception) { }
             try { d.Diagnosis.AddRange(Diagnosis.Analyze(d)); } catch (Exception) { }
-            try { d.ActionPlan.AddRange(ActionPlan.Build(d)); } catch (Exception) { }
+            try { d.ActionPlan.AddRange(ActionPlan.Build(d, d.N1)); } catch (Exception) { }
             var r = new CollectionResult { Data = d };
             r.FullText = ReportBuilder.BuildFull(d);
             r.ResumoText = ReportBuilder.BuildResumo(d);
