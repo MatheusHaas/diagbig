@@ -128,6 +128,23 @@ Amostras (pasta amostras\)
 - my_*.ini ................. my.ini do MySQL 4 (WinMySQLadmin), do instalador 5.1 e do MariaDB; com e sem log-error, / e \.
 
 
+N) ROTEIRO RAPIDO COM O SIMULADOR (1.6.7) - pasta simulador\, SIMULAR.bat como ADMINISTRADOR
+   Antes de cada rodada, opcao L (limpa o log Sistema da VM) para os eventos de uma rodada nao contaminarem a outra.
+   Depois de cada opcao, C: coleta sem janela e mostra PARA O N1, ONDE ESTA O PROBLEMA, linhas do RESUMO e avisos.
+   Rodada A - tabela + my.ini + queda: opcoes 3 e 10, depois C.
+     Esperado: N1 "Acione o N2 para tratar as tabelas: loja.movimento..." e "ATENCAO MY.INI ... DEVEM ficar protegidas:
+     innodb_doublewrite=ON (hoje OFF...) e innodb_flush_log_at_trx_commit=1 (hoje 2) ... REINICIAR o servico do MariaDB".
+     Opcoes 11 e 9 restauram my.ini e .err.
+   Rodada B - banco nao sobe: opcao 4, depois C. Esperado: "REINSTALAR NO MESMO TERMINAL" + aviso de data/hora/bateria generico.
+   Rodada C - relogio: opcao 12 (volta 3 dias e corrige), depois C.
+     Esperado: bloco RELOGIO DO WINDOWS com 2 eventos, linha RELOGIO (DATA/HORA) em ATENCAO e "ATENCAO DATA/HORA ... Orientar o
+     tecnico da farmacia". SE NAO APARECER, a leitura do evento Kernel-General 1 falhou (anotar e me avisar; abrir o Visualizador de
+     Eventos > Sistema > Kernel-General 1 e conferir NewTime/OldTime).
+   Rodada D - disco: opcao 2 (volume ??), C. Esperado: "Unidade: NAO INFORMADA pelo Windows" e, se a VM tem 1 disco, "Este PC tem 1 disco
+     fisico". Opcao 13 (volume D:) -> "Unidade: D:". Opcao 1 (bad block) -> N1 "TROCAR O SERVIDOR/DISCO" com \Device\Harddisk0\DR0.
+   Janela: opcao G abre o DiagBIG com janela: botao "Testar memoria (mdsched)" (responder Nao, ou Sim e fechar o mdsched) e
+     "Verificar disco". Obs.: bad block e Ntfs 55 antigos (fora do periodo) nao tem como simular: Write-EventLog grava com a data de agora.
+
 N) Novidades da 1.6.6 (conferir na VM)
    - my.ini com innodb_doublewrite=OFF e innodb_flush_log_at_trx_commit=2 + um .err com "marked as crashed": no topo, PARA O N1,
      aparece "ATENÇÃO MY.INI: estas variáveis DEVEM ficar protegidas ... REINICIAR o serviço do MariaDB". Tirar as linhas e o aviso some.

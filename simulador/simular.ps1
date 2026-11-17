@@ -55,9 +55,65 @@ function Linhas-Err($linhas) {
     }
 }
 
+# my.ini: acha pelo --defaults-file do servico; senao, ao lado do .err (pasta data).
+function Achar-Ini {
+    $svc = Servico-Banco
+    if ($svc -and $svc.PathName -match '--defaults-file=("?)(.+?\.(ini|cnf))') {
+        if (Test-Path $Matches[2]) { return $Matches[2] }
+    }
+    $e = Achar-Err
+    if ($e) {
+        $p = Join-Path (Split-Path $e) "my.ini"
+        if (Test-Path $p) { return $p }
+    }
+    return $null
+}
+
+# Coloca innodb_doublewrite=OFF e innodb_flush_log_at_trx_commit=2 no [mysqld] (faz copia antes) e reinicia o servico.
+function Ini-Risco {
+    $f = Achar-Ini
+    if (-not $f) { Write-Host "NAO ACHEI o my.ini." -ForegroundColor Red; return }
+    Com-Servico {
+        $bak = $f + ".bak-diagbig"
+        if (-not (Test-Path $bak)) { Copy-Item $f $bak; Write-Host "Copia de seguranca: $bak" }
+        $lin = @(Get-Content -Path $f -Encoding Default | Where-Object { $_ -notmatch '^\s*innodb_doublewrite\s*=' -and $_ -notmatch '^\s*innodb_flush_log_at_trx_commit\s*=' })
+        $novo = New-Object System.Collections.ArrayList
+        $ok = $false
+        foreach ($l in $lin) {
+            [void]$novo.Add($l)
+            if (-not $ok -and $l -match '^\s*\[mysqld\]\s*$') {
+                [void]$novo.Add("innodb_doublewrite=OFF")
+                [void]$novo.Add("innodb_flush_log_at_trx_commit=2")
+                $ok = $true
+            }
+        }
+        if (-not $ok) { Write-Host "Sem [mysqld] no my.ini: nada alterado." -ForegroundColor Red; return }
+        Set-Content -Path $f -Value $novo -Encoding Default
+        Write-Host "my.ini alterado: $f"
+    }
+}
+
+function Ini-Restaurar {
+    $f = Achar-Ini
+    if ($f -and (Test-Path ($f + ".bak-diagbig"))) {
+        Com-Servico { Copy-Item ($f + ".bak-diagbig") $f -Force; Remove-Item ($f + ".bak-diagbig"); Write-Host "Restaurado: $f" }
+    } else { Write-Host "Nada para restaurar." }
+}
+
+# Relogio: volta a data 3 dias e corrige em seguida. O Windows registra 2 eventos Kernel-General 1 (salto de 3 dias).
+function Relogio-Saltar {
+    Write-Host "Voltando o relogio 3 dias e corrigindo em seguida..."
+    try { Stop-Service -Name w32time -Force -ErrorAction SilentlyContinue } catch { }
+    Set-Date -Adjust (New-TimeSpan -Days -3) | Out-Null
+    Start-Sleep -Seconds 3
+    Set-Date -Adjust (New-TimeSpan -Days 3 -Seconds 3) | Out-Null
+    try { Start-Service -Name w32time -ErrorAction SilentlyContinue } catch { }
+    Write-Host ("Relogio de volta: " + (Get-Date))
+}
+
 switch ($Cenario) {
- 1 { Evento "disk" 7 "O dispositivo tem um bloco invalido (bad block)." }
- 2 { Evento "Ntfs" 55 "Estrutura do sistema de arquivos corrompida." }
+ 1 { Evento "disk" 7 "O dispositivo \Device\Harddisk0\DR0 tem um bloco invalido (bad block)." }
+ 2 { Evento "Ntfs" 55 "Corrupcao detectada na estrutura do sistema de arquivos, no volume ??." }
  3 { Linhas-Err @(
       "8 [ERROR] mysqld: Table '.\loja\movimento' is marked as crashed and should be repaired",
       "9 [ERROR] mysqld: Table '.\loja\movimento' is marked as crashed and should be repaired",
@@ -84,5 +140,9 @@ switch ($Cenario) {
  9 { $f = Achar-Err
      if ($f -and (Test-Path ($f + ".bak-diagbig"))) { Com-Servico { Copy-Item ($f + ".bak-diagbig") $f -Force; Remove-Item ($f + ".bak-diagbig"); Write-Host "Restaurado: $f" } }
      else { Write-Host "Nada para restaurar." } }
+ 10 { Ini-Risco }
+ 11 { Ini-Restaurar }
+ 12 { Relogio-Saltar }
+ 13 { Evento "Ntfs" 55 "Corrupcao detectada na estrutura do sistema de arquivos, no volume D:." }
  default { Write-Host "Cenario invalido." }
 }
