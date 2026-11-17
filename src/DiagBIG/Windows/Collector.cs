@@ -197,6 +197,21 @@ namespace DiagBIG.Windows
             catch (Exception) { }
             hwSection.Blocks.Add(hw);
             d.Summary.Add(ReportBuilder.Summarize("MEMÓRIA/HARDWARE", new[] { hw }));
+
+            // Relógio: data/hora do Windows alterada por mais de 1 dia (bateria da placa-mãe/CMOS fraca). Com data errada o banco não sobe.
+            ReportBlock clock = RunEvents("RELÓGIO DO WINDOWS (DATA/HORA ALTERADA POR MAIS DE 1 DIA)", () =>
+            {
+                bool capped;
+                var list = EventLogs.Query("System",
+                    "*[System[Provider[@Name='" + Config.TimeChangeProvider + "'] and EventID=" + Config.TimeChangeId + " and " + time + "]]",
+                    rec => EventLogs.TimeJumpDays(rec) >= Config.TimeChangeMinDays, out capped);
+                return Tuple(list, capped);
+            });
+            clock.Tag = BlockTag.Clock;
+            clock.Info.Add("Ajuste de NTP (segundos) é ignorado. Salto de dias ou anos após ligar o PC indica bateria da placa-mãe (CR2032) fraca ou data errada na BIOS.");
+            clock.Info.Add("Com a data errada o banco não sobe (e certificados, licenças e agendamentos falham). Conferir data/hora no Windows e na BIOS.");
+            hwSection.Blocks.Add(clock);
+            d.Summary.Add(ReportBuilder.Summarize("RELÓGIO (DATA/HORA)", new[] { clock }));
             d.Sections.Add(hwSection);
 
             // ---------- Parte 2: banco ----------

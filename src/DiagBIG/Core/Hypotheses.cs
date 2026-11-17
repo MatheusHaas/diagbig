@@ -75,6 +75,37 @@ namespace DiagBIG.Core
             return Blocks(d, tag).SelectMany(b => b.Occurrences);
         }
 
+        /// <summary>Bad block dos últimos Config.BadBlockRecentDays dias (período + histórico). Mais antigo só informa.</summary>
+        static DateTime BadBlockLimit(ReportData d)
+        {
+            DateTime now = d.CollectedAt > new DateTime(2000, 1, 1) ? d.CollectedAt : DateTime.Now;
+            return now.AddDays(-Config.BadBlockRecentDays);
+        }
+
+        public static List<Occurrence> RecentBadSectors(ReportData d)
+        {
+            DateTime limit = BadBlockLimit(d);
+            return Occ(d, BlockTag.Disk).Concat(Occ(d, BlockTag.DiskOld)).Where(IsBadSector).Where(o => !o.Time.HasValue || o.Time.Value >= limit).ToList();
+        }
+
+        public static List<Occurrence> StaleBadSectors(ReportData d)
+        {
+            DateTime limit = BadBlockLimit(d);
+            return Occ(d, BlockTag.Disk).Concat(Occ(d, BlockTag.DiskOld)).Where(IsBadSector).Where(o => o.Time.HasValue && o.Time.Value < limit).ToList();
+        }
+
+        /// <summary>"\Device\Harddisk0\DR0 (último em 12/09/2026)" por disco citado nos bad blocks.</summary>
+        public static string BadSectorWhere(IList<Occurrence> bad)
+        {
+            var parts = new List<string>();
+            foreach (var g in bad.GroupBy(o => DiskTarget.DiskId(o.Message) ?? "disco não identificado no evento"))
+            {
+                DateTime? last = g.Where(o => o.Time.HasValue).Select(o => o.Time).OrderByDescending(t => t).FirstOrDefault();
+                parts.Add(g.Key + " (" + g.Count() + "x" + (last.HasValue ? ", último em " + last.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "") + ")");
+            }
+            return string.Join("; ", parts.ToArray());
+        }
+
         /// <summary>Queda de energia, tela azul, hardware e disco achados no relatório (para reforçar os avisos do my.ini).</summary>
         public static List<string> RiskReasons(ReportData d)
         {
@@ -158,9 +189,10 @@ namespace DiagBIG.Core
             // 2) disco
             var diskR = new List<string>();
             int diskRetries = Occ(d, BlockTag.Disk).Count(o => string.Equals(Grouping.ShortSource(o.Source), "disk", StringComparison.OrdinalIgnoreCase) && o.EventId == "153");
-            int badSectors = Occ(d, BlockTag.Disk).Count(IsBadSector);
+            var recentBad = RecentBadSectors(d);
+            int badSectors = recentBad.Count;
             if (badSectors > 0)
-                diskR.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s)): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
+                diskR.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s) nos últimos " + Config.BadBlockRecentDays / 30 + " meses; " + BadSectorWhere(recentBad) + "): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
                            "Fazer backup agora. " + (smartBad ? "" : "O SMART não acusou falha, mas SMART OK não descarta o disco: o setor ruim pode já ter sido remapeado ou o disco estar atrás de RAID. ") +
                            "chkdsk /r não conserta disco que está morrendo.");
             int ntfsCorrupt = Occ(d, BlockTag.Disk).Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && o.EventId == "55");
@@ -172,13 +204,12 @@ namespace DiagBIG.Core
             var oldDisk = Occ(d, BlockTag.DiskOld).ToList();
             if (oldDisk.Count > 0)
             {
-                int oldBad = oldDisk.Count(IsBadSector);
+                int oldBad = StaleBadSectors(d).Count;
                 int oldNtfs = oldDisk.Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && (o.EventId == "55" || o.EventId == "98"));
                 diskR.Add("Histórico de disco ANTES do período (ainda no log): " + string.Join("; ", DiskTarget.OldSummary(oldDisk).ToArray()) + ". " +
-                          (oldBad > 0 ? "Bad block (disk 7) não some sozinho: tratar como disco com defeito, backup e troca. " : "") +
+                          (oldBad > 0 ? "Bad block com mais de " + Config.BadBlockRecentDays / 30 + " meses (" + BadSectorWhere(StaleBadSectors(d)) + "): NÃO conta para trocar o disco sozinho; se o banco já foi reinstalado e os dados saíram sem erro, só acompanhar (SMART e chkdsk /scan) e ver se volta. " : "") +
                           (oldNtfs > 0 ? "NTFS corrompido antigo: rodar chkdsk /scan agora para ver se o erro continua e se há mais de uma unidade afetada. " : "") +
                           "Se o evento não diz a unidade (volume ??), o relatório mostra se o PC tem um disco só.");
-                if (oldBad > 0) badSectors += oldBad;
             }
             if (bsodDisk > 0 || diskEvents || smartBad)
             {

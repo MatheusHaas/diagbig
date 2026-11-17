@@ -87,6 +87,30 @@ namespace DiagBIG.Windows
             catch (Exception) { return "não foi possível ler os dados do evento"; }
         }
 
+        /// <summary>Kernel-General 1: [0] NewTime, [1] OldTime. Devolve o salto em dias (0 se não deu para ler).</summary>
+        public static double TimeJumpDays(EventRecord rec)
+        {
+            try
+            {
+                var p = rec.Properties;
+                if (p == null || p.Count < 2) return 0;
+                DateTime? a = ToTime(p[0].Value), b = ToTime(p[1].Value);
+                if (!a.HasValue || !b.HasValue) return 0;
+                return Math.Abs((a.Value - b.Value).TotalDays);
+            }
+            catch (Exception) { return 0; }
+        }
+
+        static DateTime? ToTime(object v)
+        {
+            if (v is DateTime) return (DateTime)v;
+            if (v is long) return DateTime.FromFileTimeUtc((long)v);
+            if (v is ulong) return DateTime.FromFileTimeUtc(unchecked((long)(ulong)v));
+            DateTime t;
+            if (v != null && DateTime.TryParse(Convert.ToString(v, CultureInfo.InvariantCulture), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out t)) return t;
+            return null;
+        }
+
         static long ToLong(object v)
         {
             if (v == null) return 0;

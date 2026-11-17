@@ -26,13 +26,13 @@ namespace DiagBIG.Core
         {
             var plan = new List<string>();
             var disk = Occ(d, BlockTag.Disk).ToList();
-            int badSectors = disk.Count(Hypotheses.IsBadSector);
+            var recentBad = Hypotheses.RecentBadSectors(d);
+            int badSectors = recentBad.Count;
             int ntfs = disk.Count(o => Is(o, "Ntfs", "55") || Is(o, "Ntfs", "98"));
             int retries = disk.Count(o => Is(o, "disk", "153"));
             var oldDisk = Occ(d, BlockTag.DiskOld).ToList();
-            int oldBad = oldDisk.Count(Hypotheses.IsBadSector);
+            int oldBad = recentBad.Count(o => oldDisk.Contains(o));
             int oldNtfs = oldDisk.Count(o => Is(o, "Ntfs", "55") || Is(o, "Ntfs", "98"));
-            badSectors += oldBad;
             bool smartBad = d.Summary.Any(s => s.Label == "SMART" && s.Status == CheckStatus.Atencao);
 
             var power = Occ(d, BlockTag.Power).ToList();
@@ -60,7 +60,30 @@ namespace DiagBIG.Core
 
             bool fatalDisk = badSectors > 0 || ntfs > 0 || smartBad || retries >= Config.DiskRetryThreshold ||
                              repairDiskCode || (repairFailed && disk.Count > 0);
-            bool anyProblem = fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0;
+            var clockEv = Occ(d, BlockTag.Clock).ToList();
+            bool clockBad = clockEv.Count > 0;
+            DateTime? clockLast = clockEv.Where(o => o.Time.HasValue).Select(o => o.Time).OrderByDescending(t => t).FirstOrDefault();
+            string clockWhen = clockLast.HasValue ? ", último em " + clockLast.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "";
+            var cfgWarn = d.Sections.SelectMany(s => s.Blocks).Where(b => b.Tag == BlockTag.Db && b.Verified).SelectMany(b => b.Warnings).ToList();
+            bool dwOff = cfgWarn.Any(w => w.StartsWith("innodb_doublewrite=OFF", StringComparison.OrdinalIgnoreCase));
+            string flushBad = null;
+            foreach (string w in cfgWarn)
+                if (w.StartsWith("innodb_flush_log_at_trx_commit=", StringComparison.OrdinalIgnoreCase)) flushBad = w.Substring("innodb_flush_log_at_trx_commit=".Length, 1);
+            var risky = new List<string>();
+            if (dwOff) risky.Add("innodb_doublewrite=ON (hoje OFF; ou remover a linha)");
+            if (flushBad != null) risky.Add("innodb_flush_log_at_trx_commit=1 (hoje " + flushBad + ")");
+            string powerLine = null;
+            if (risky.Count > 0)
+                powerLine = "ATENÇÃO MY.INI" + (unexpected > 0 ? " (" + unexpected + " desligamento(s)/queda(s) de energia no período)" : "") +
+                            ": estas variáveis DEVEM ficar protegidas: " + string.Join(" e ", risky.ToArray()) +
+                            ". Ajustar e REINICIAR o serviço do MariaDB depois que o reparo for concluído com sucesso, para evitar novas perdas de dados.";
+            else if (unexpected > 0)
+                powerLine = "ATENÇÃO ENERGIA: " + unexpected + " desligamento(s)/queda(s) de energia no período. Conferir o no-break e, no my.ini, innodb_doublewrite=ON e innodb_flush_log_at_trx_commit=1 (reiniciar o serviço do MariaDB depois de ajustar).";
+            string clockLine = clockBad
+                ? "ATENÇÃO DATA/HORA: o Windows teve a data/hora alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ": provável bateria da placa-mãe (CR2032) fraca ou data errada na BIOS. Com a data errada o banco não sobe. Acertar data/hora e trocar a bateria ANTES de reparar o banco."
+                : "Conferir também a data/hora do Windows e a bateria da placa-mãe (CR2032): com a data errada o banco não sobe.";
+            bool onlyClock = clockBad && !(fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0);
+            bool anyProblem = fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0 || clockBad;
             if (!anyProblem)
             {
                 if (n1 != null) n1.Add("Nenhum indício forte nos logs lidos. Sem encaminhamento para o N2 por este relatório.");
@@ -74,7 +97,7 @@ namespace DiagBIG.Core
                 bool tabOnly = tI != null && tI.Verdict == DiagVerdict.Provavel &&
                                (sI == null || sI.Verdict != DiagVerdict.Provavel) && (mI == null || mI.Verdict != DiagVerdict.Provavel);
                 var why = new List<string>();
-                if (badSectors > 0) why.Add("setor defeituoso no disco");
+                if (badSectors > 0) why.Add("setor defeituoso no disco (" + Hypotheses.BadSectorWhere(recentBad) + ")");
                 if (ntfs > 0) why.Add("NTFS corrompido");
                 if (smartBad) why.Add("SMART em atenção");
                 if (retries >= Config.DiskRetryThreshold) why.Add("disco com E/S repetida");
@@ -92,17 +115,34 @@ namespace DiagBIG.Core
                     if (tabs.Count > 15) n1.Add("... e mais " + (tabs.Count - 15));
                     n1.Add("Em caso de não sucesso, acionar equipe técnica.");
                     n1.Add("Motivo: dano só em tabela(s) e nenhum erro de disco/RAM nos logs.");
+                    if (powerLine != null) n1.Add(powerLine);
+                    if (clockBad) n1.Add(clockLine);
                 }
                 else if (dbDamaged)
                 {
                     n1.Add("AÇÃO: Acione a equipe técnica para REINSTALAR NO MESMO TERMINAL.");
                     n1.Add("Motivo: dano além de tabelas (arquivos de sistema do banco, banco que não sobe ou erro de memória do banco), sem defeito de disco nos logs." +
                            (ramSuspect ? " HÁ SINAL DE RAM: testar a RAM antes." : ""));
+                    if (powerLine != null) n1.Add(powerLine);
+                    n1.Add(clockLine);
+                }
+                else if (onlyClock)
+                {
+                    n1.Add("AÇÃO: Acione o N2 para acertar a data/hora do Windows e da BIOS e trocar a bateria da placa-mãe (CR2032).");
+                    n1.Add("Motivo: data/hora do Windows alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + "; com a data errada o banco não sobe. Sem dano de banco nem de disco nos logs.");
+                    if (powerLine != null) n1.Add(powerLine);
                 }
                 else
                 {
                     n1.Add("AÇÃO: Acione o N2 para reparo simples do Windows (DISM e SFC). Sem dano de banco nem de disco grave nos logs.");
-                    n1.Add("Motivo: " + (unexpected > 0 ? unexpected + " desligamento(s) inesperado(s)" : ramSuspect ? "sinal de RAM" : driverBsod ? "tela azul de driver" : "eventos de disco/Windows") + ".");
+                    var mot = new List<string>();
+                    if (unexpected > 0) mot.Add(unexpected + " desligamento(s) inesperado(s)");
+                    if (ramSuspect) mot.Add("sinal de RAM");
+                    if (driverBsod) mot.Add("tela azul de driver");
+                    if (mot.Count == 0) mot.Add("eventos de disco/Windows");
+                    n1.Add("Motivo: " + string.Join("; ", mot.ToArray()) + ".");
+                    if (powerLine != null) n1.Add(powerLine);
+                    n1.Add(clockLine);
                 }
             }
 
@@ -166,9 +206,12 @@ namespace DiagBIG.Core
                 plan.Add(step("Se mesmo reinstalado voltar a cair ou corromper: é hardware (disco, RAM, fonte, placa); trocar o servidor/peças em vez de reinstalar de novo."));
             }
 
+            if (clockBad && !fatalDisk)
+                plan.Add(step("Data/hora: o Windows teve a data alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ". Acertar data/hora (Windows e BIOS) e trocar a bateria da placa-mãe (CR2032) antes de subir o banco; com a data errada ele não sobe."));
             if (unexpected > 0)
                 plan.Add(step("Energia: " + unexpected + " desligamento(s) inesperado(s). Usar no-break (nobreak) com bateria boa no servidor; queda de energia corrompe banco."));
-            plan.Add(step("my.ini: manter innodb_doublewrite ligado (padrão) e innodb_flush_log_at_trx_commit=1 em servidor sem no-break; tirar innodb_force_recovery depois da manutenção. Ver os AVISOS da seção do banco."));
+            plan.Add(step("my.ini: innodb_doublewrite DEVE ficar ON (padrão; tirar a linha OFF) e innodb_flush_log_at_trx_commit=1" + (risky.Count > 0 ? " (hoje: " + string.Join(" e ", risky.ToArray()) + ")" : "") +
+                          "; tirar innodb_force_recovery depois da manutenção. Ajustar e REINICIAR o serviço do MariaDB depois que o reparo for concluído com sucesso, para evitar novas perdas de dados. Ver os AVISOS da seção do banco."));
             return plan;
         }
     }

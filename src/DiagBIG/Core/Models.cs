@@ -50,6 +50,8 @@ namespace DiagBIG.Core
         public const string Disk = "disk";
         /// <summary>Eventos de disco/NTFS ANTES do período escolhido (ainda presentes no log): histórico.</summary>
         public const string DiskOld = "diskold";
+        /// <summary>Hora do Windows alterada por mais de 1 dia (bateria da placa-mãe/CMOS ou relógio errado).</summary>
+        public const string Clock = "clock";
         public const string Smart = "smart";
         public const string Power = "power";
         public const string Hardware = "hardware";

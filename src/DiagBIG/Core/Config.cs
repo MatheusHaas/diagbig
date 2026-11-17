@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.6.5";
+        public const string Version = "1.6.6";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -62,6 +62,12 @@ namespace DiagBIG.Core
         /// <summary>Resultado do Diagnóstico de Memória do Windows (mdsched). 1102 = erros de hardware detectados.</summary>
         public const string MemDiagProvider = "Microsoft-Windows-MemoryDiagnostics-Results";
         public const int MemDiagErrorId = 1102;
+        /// <summary>Bad block (disk 7) só conta para o veredito de trocar o disco se for dos últimos N dias; mais antigo fica só no histórico.</summary>
+        public const int BadBlockRecentDays = 90;
+        /// <summary>Kernel-General 1 = hora do sistema alterada. Só conta mudança de pelo menos este tanto (relógio zerado/bateria da placa-mãe), não ajuste de NTP.</summary>
+        public const string TimeChangeProvider = "Microsoft-Windows-Kernel-General";
+        public const int TimeChangeId = 1;
+        public const double TimeChangeMinDays = 1.0;
         /// <summary>1101 = o teste de memória rodou e não achou erros.</summary>
         public const int MemDiagOkId = 1101;
         /// <summary>Resource-Exhaustion-Detector 2004: pouca memória virtual.</summary>

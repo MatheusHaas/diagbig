@@ -45,6 +45,16 @@ namespace DiagBIG.Core
             return text;
         }
 
+        static readonly Regex DiskIdRx = new Regex(@"\\Device\\Harddisk\d+\\DR\d+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>ID do disco que o evento cita (ex.: \Device\Harddisk0\DR0); null se não cita.</summary>
+        public static string DiskId(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return null;
+            Match m = DiskIdRx.Match(message);
+            return m.Success ? m.Value : null;
+        }
+
         /// <summary>Acrescenta a linha "Unidade: ..." no começo da mensagem (uma vez só).</summary>
         public static void Annotate(Occurrence o, IDictionary<string, string> volumeLetters, string singleDiskNote)
         {
