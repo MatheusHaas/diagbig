@@ -80,8 +80,8 @@ namespace DiagBIG.Core
             else if (unexpected > 0)
                 powerLine = "ATENÇÃO ENERGIA: " + unexpected + " desligamento(s)/queda(s) de energia no período. Conferir o no-break e, no my.ini, innodb_doublewrite=ON e innodb_flush_log_at_trx_commit=1 (reiniciar o serviço do MariaDB depois de ajustar).";
             string clockLine = clockBad
-                ? "ATENÇÃO DATA/HORA: o Windows teve a data/hora alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ": provável bateria da placa-mãe (CR2032) fraca ou data errada na BIOS. Com a data errada o banco não sobe. Acertar data/hora e trocar a bateria ANTES de reparar o banco."
-                : "Conferir também a data/hora do Windows e a bateria da placa-mãe (CR2032): com a data errada o banco não sobe.";
+                ? "ATENÇÃO DATA/HORA: o Windows teve a data/hora alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ": provável bateria da placa-mãe (CR2032) fraca ou data errada na BIOS. Com a data errada o banco não sobe. Orientar o técnico da farmácia a conferir data/hora (Windows e BIOS) e, se voltar a errar, a trocar a bateria, ANTES de reparar o banco."
+                : "Orientar o técnico da farmácia a conferir também a data/hora do Windows e a bateria da placa-mãe (CR2032): com a data errada o banco não sobe.";
             bool onlyClock = clockBad && !(fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0);
             bool anyProblem = fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0 || clockBad;
             if (!anyProblem)
@@ -128,7 +128,7 @@ namespace DiagBIG.Core
                 }
                 else if (onlyClock)
                 {
-                    n1.Add("AÇÃO: Acione o N2 para acertar a data/hora do Windows e da BIOS e trocar a bateria da placa-mãe (CR2032).");
+                    n1.Add("AÇÃO: Orientar o técnico da farmácia a acertar a data/hora do Windows e da BIOS e, se voltar a errar, a trocar a bateria da placa-mãe (CR2032). Não é caso de N2 nem de equipe técnica.");
                     n1.Add("Motivo: data/hora do Windows alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + "; com a data errada o banco não sobe. Sem dano de banco nem de disco nos logs.");
                     if (powerLine != null) n1.Add(powerLine);
                 }
@@ -207,7 +207,7 @@ namespace DiagBIG.Core
             }
 
             if (clockBad && !fatalDisk)
-                plan.Add(step("Data/hora: o Windows teve a data alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ". Acertar data/hora (Windows e BIOS) e trocar a bateria da placa-mãe (CR2032) antes de subir o banco; com a data errada ele não sobe."));
+                plan.Add(step("Data/hora: o Windows teve a data alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ". O técnico da farmácia deve acertar data/hora (Windows e BIOS) e, se voltar a errar, trocar a bateria da placa-mãe (CR2032) antes de subir o banco; com a data errada ele não sobe."));
             if (unexpected > 0)
                 plan.Add(step("Energia: " + unexpected + " desligamento(s) inesperado(s). Usar no-break (nobreak) com bateria boa no servidor; queda de energia corrompe banco."));
             plan.Add(step("my.ini: innodb_doublewrite DEVE ficar ON (padrão; tirar a linha OFF) e innodb_flush_log_at_trx_commit=1" + (risky.Count > 0 ? " (hoje: " + string.Join(" e ", risky.ToArray()) + ")" : "") +

@@ -163,7 +163,7 @@ BAD BLOCK, RELÓGIO E MY.INI NO "PARA O N1" (1.6.6)
     fica no histórico e só informa (banco reinstalado e dados extraídos sem erro = acompanhar
     com SMART e chkdsk /scan). O Motivo mostra o ID do disco (\Device\Harddisk0\DR0).
   - RELÓGIO: o relatório lê as mudanças de hora do Windows maiores que 1 dia (Kernel-General 1).
-    Detectando, o N1 avisa: bateria da placa-mãe (CR2032) fraca ou data errada na BIOS; com a
+    Detectando, o N1 manda ORIENTAR O TÉCNICO DA FARMÁCIA (não é trabalho do N1/N2): bateria da placa-mãe (CR2032) fraca ou data errada na BIOS; com a
     data errada o banco não sobe. Sem detecção, os casos de reparo simples/reinstalar mandam só conferir.
   - Nos casos de tabelas, reinstalar e reparo do Windows: com desligamentos/quedas de energia e/ou
     innodb_doublewrite=OFF e innodb_flush_log_at_trx_commit=2, o N1 diz que DEVEM ficar ON e 1, e que é

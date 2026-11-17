@@ -133,7 +133,7 @@ N) Novidades da 1.6.6 (conferir na VM)
      aparece "ATENÇÃO MY.INI: estas variáveis DEVEM ficar protegidas ... REINICIAR o serviço do MariaDB". Tirar as linhas e o aviso some.
    - Mudar a data do Windows (ex.: voltar 3 dias e depois corrigir): bloco "RELÓGIO DO WINDOWS (DATA/HORA ALTERADA POR MAIS DE 1 DIA)"
      na seção MEMÓRIA RAM E HARDWARE, linha RELÓGIO (DATA/HORA) no RESUMO e "ATENÇÃO DATA/HORA" no N1. Sem mudança: "nenhuma ocorrência".
-   - Sem relógio detectado, nos casos de reparo simples e reinstalar, o N1 traz "Conferir também a data/hora do Windows e a bateria".
+   - Sem relógio detectado, nos casos de reparo simples e reinstalar, o N1 traz "Orientar o técnico da farmácia a conferir também a data/hora do Windows e a bateria".
    - Bad block: só dos últimos 3 meses manda trocar o disco (Motivo com \Device\HarddiskN\DRN); mais antigo fica no histórico.
 
 N) Novidades da 1.6.5 (conferir na VM)
