@@ -169,6 +169,17 @@ namespace DiagBIG.Core
                            "Fazer backup ANTES de reparar, depois rodar chkdsk /scan e, na janela de manutenção, chkdsk /f (o /r também procura setor ruim e demora). " +
                            "SFC/DISM não reparam o NTFS. Se voltar depois do chkdsk, suspeitar do disco, cabo, controladora ou energia" +
                            (badSectors > 0 ? "; junto com o setor defeituoso acima, tratar como disco com falha." : "."));
+            var oldDisk = Occ(d, BlockTag.DiskOld).ToList();
+            if (oldDisk.Count > 0)
+            {
+                int oldBad = oldDisk.Count(IsBadSector);
+                int oldNtfs = oldDisk.Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && (o.EventId == "55" || o.EventId == "98"));
+                diskR.Add("Histórico de disco ANTES do período (ainda no log): " + string.Join("; ", DiskTarget.OldSummary(oldDisk).ToArray()) + ". " +
+                          (oldBad > 0 ? "Bad block (disk 7) não some sozinho: tratar como disco com defeito, backup e troca. " : "") +
+                          (oldNtfs > 0 ? "NTFS corrompido antigo: rodar chkdsk /scan agora para ver se o erro continua e se há mais de uma unidade afetada. " : "") +
+                          "Se o evento não diz a unidade (volume ??), o relatório mostra se o PC tem um disco só.");
+                if (oldBad > 0) badSectors += oldBad;
+            }
             if (bsodDisk > 0 || diskEvents || smartBad)
             {
                 var ev = new List<string>();

@@ -29,6 +29,10 @@ namespace DiagBIG.Core
             int badSectors = disk.Count(Hypotheses.IsBadSector);
             int ntfs = disk.Count(o => Is(o, "Ntfs", "55") || Is(o, "Ntfs", "98"));
             int retries = disk.Count(o => Is(o, "disk", "153"));
+            var oldDisk = Occ(d, BlockTag.DiskOld).ToList();
+            int oldBad = oldDisk.Count(Hypotheses.IsBadSector);
+            int oldNtfs = oldDisk.Count(o => Is(o, "Ntfs", "55") || Is(o, "Ntfs", "98"));
+            badSectors += oldBad;
             bool smartBad = d.Summary.Any(s => s.Label == "SMART" && s.Status == CheckStatus.Atencao);
 
             var power = Occ(d, BlockTag.Power).ToList();
@@ -104,7 +108,8 @@ namespace DiagBIG.Core
 
             // Evidência de disco em texto.
             var ev = new List<string>();
-            if (badSectors > 0) ev.Add(badSectors + "x setor defeituoso (bad block)");
+            if (badSectors > 0) ev.Add(badSectors + "x setor defeituoso (bad block)" + (oldBad > 0 ? ", " + oldBad + " antes do período (bad block não some sozinho)" : ""));
+            if (oldNtfs > 0) ev.Add(oldNtfs + "x NTFS corrompido ANTES do período (Ntfs 55/98; confirmar com chkdsk /scan se ainda há erro)");
             if (ntfs > 0) ev.Add(ntfs + "x NTFS corrompido (Ntfs 55/98)");
             if (smartBad) ev.Add("SMART em atenção");
             if (retries >= Config.DiskRetryThreshold) ev.Add(retries + "x disk 153 (E/S repetida)");

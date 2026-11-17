@@ -114,6 +114,53 @@ namespace DiagBIG.Windows
             return null;
         }
 
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        static extern uint QueryDosDevice(string lpDeviceName, System.Text.StringBuilder lpTargetPath, int ucchMax);
+
+        /// <summary>"3" (de \Device\HarddiskVolume3) para "C:", das unidades fixas.</summary>
+        public static Dictionary<string, string> VolumeLetters()
+        {
+            var map = new Dictionary<string, string>();
+            foreach (DriveInfo d in DriveInfo.GetDrives())
+            {
+                try
+                {
+                    if (d.DriveType != DriveType.Fixed) continue;
+                    string letter = d.Name.Substring(0, 2);
+                    var sb = new System.Text.StringBuilder(512);
+                    if (QueryDosDevice(letter, sb, sb.Capacity) == 0) continue;
+                    string target = sb.ToString();
+                    const string prefix = "\\Device\\HarddiskVolume";
+                    int i = target.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                    if (i >= 0) map[target.Substring(i + prefix.Length)] = letter;
+                }
+                catch (Exception) { }
+            }
+            return map;
+        }
+
+        /// <summary>Se o PC tem um único disco físico (não USB), diz quais unidades estão nele; senão null.</summary>
+        public static string SingleDiskNote()
+        {
+            try
+            {
+                var models = new List<string>();
+                using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Model, InterfaceType FROM Win32_DiskDrive", Options()))
+                    foreach (ManagementObject mo in s.Get())
+                        using (mo)
+                        {
+                            string iface = Convert.ToString(mo["InterfaceType"], CultureInfo.InvariantCulture);
+                            if (string.Equals(iface, "USB", StringComparison.OrdinalIgnoreCase)) continue;
+                            models.Add((Convert.ToString(mo["Model"], CultureInfo.InvariantCulture) ?? "").Trim());
+                        }
+                if (models.Count != 1) return null;
+                var letters = new List<string>();
+                foreach (DriveInfo d in DriveInfo.GetDrives()) if (d.DriveType == DriveType.Fixed) letters.Add(d.Name.Substring(0, 2));
+                return "Este PC tem 1 disco físico (" + models[0] + "): as unidades " + string.Join(", ", letters.ToArray()) + " estão nele, então o evento é desse disco.";
+            }
+            catch (Exception) { return null; }
+        }
+
         public static List<string> FixedDrives()
         {
             var list = new List<string>();

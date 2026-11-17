@@ -77,6 +77,12 @@ namespace DiagBIG.Windows
                 return Tuple(list, capped);
             });
             disk.Tag = BlockTag.Disk;
+            Dictionary<string, string> volumeLetters = null;
+            string singleDisk = null;
+            try { volumeLetters = SystemInfo.VolumeLetters(); } catch (Exception) { }
+            try { singleDisk = SystemInfo.SingleDiskNote(); } catch (Exception) { }
+            foreach (Occurrence o in disk.Occurrences) DiskTarget.Annotate(o, volumeLetters, singleDisk);
+            if (singleDisk != null) disk.Info.Add(singleDisk);
             if (dumpFailures > 0)
                 disk.Info.Add("Ignorados " + dumpFailures + " evento(s) volmgr " + string.Join("/", Config.DumpFailureIds.Select(i => i.ToString()).ToArray()) +
                               " (falha ao gravar o despejo de memória): consequência de tela azul, não defeito de disco.");
@@ -85,6 +91,26 @@ namespace DiagBIG.Windows
                                 "; aviso 129 (reset do dispositivo) dessas fontes.");
             diskSection.Blocks.Add(disk);
             d.Summary.Add(ReportBuilder.Summarize("DISCO", new[] { disk }));
+
+            // Histórico: o mesmo filtro (Crítico/Erro de disk, Ntfs etc.), mas ANTES do período escolhido, enquanto o log ainda tiver.
+            progress("Procurando eventos antigos de disco/NTFS...");
+            DateTime sinceCopy = d.Since;
+            ReportBlock diskOld = RunEvents("HISTÓRICO DE DISCO/NTFS ANTES DO PERÍODO (ainda no log do Windows)", () =>
+            {
+                bool capped;
+                var list = EventLogs.Query("System", "*[System[(Level=1 or Level=2)]]", rec =>
+                    rec.TimeCreated.HasValue && rec.TimeCreated.Value < sinceCopy &&
+                    !Storage.IsDumpFailure(rec.ProviderName, rec.Id) && Storage.IsDiskEvent(rec.ProviderName, rec.Level ?? 0, rec.Id), out capped);
+                return Tuple(list, capped);
+            });
+            diskOld.Tag = BlockTag.DiskOld;
+            foreach (Occurrence o in diskOld.Occurrences) DiskTarget.Annotate(o, volumeLetters, singleDisk);
+            diskOld.Info.Insert(0, "Erros e críticos de disco/NTFS (inclui bad block, disk 7, Ntfs 55) de antes de " + d.Since.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) +
+                                   ", enquanto o log do Windows ainda os guarda. Não entram na contagem do período, mas bad block e NTFS corrompido antigos contam para o veredito.");
+            if (diskOld.Occurrences.Count > 0) diskSection.Blocks.Add(diskOld);
+            else if (!diskOld.Verified) diskSection.Blocks.Add(diskOld);
+            if (diskOld.Occurrences.Count > 0)
+                d.Summary.Add(new SummaryItem { Label = "DISCO (HISTÓRICO)", Status = CheckStatus.Atencao, Text = string.Join("; ", DiskTarget.OldSummary(diskOld.Occurrences).ToArray()) + " (antes do período; veja a seção DISCO / NTFS)" });
 
             progress("Verificando RAID e SMART...");
             try { d.Raid = SystemInfo.DetectRaid(); }

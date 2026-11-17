@@ -48,6 +48,8 @@ namespace DiagBIG.Core
     public static class BlockTag
     {
         public const string Disk = "disk";
+        /// <summary>Eventos de disco/NTFS ANTES do período escolhido (ainda presentes no log): histórico.</summary>
+        public const string DiskOld = "diskold";
         public const string Smart = "smart";
         public const string Power = "power";
         public const string Hardware = "hardware";

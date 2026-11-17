@@ -149,6 +149,15 @@ BOTÃO VERIFICAR DISCO (chkdsk /scan)
   relatório já indica disco com defeito grave, pede confirmação: ler o disco
   inteiro pode piorar. chkdsk /f e /r continuam manuais, depois do backup.
 
+UNIDADE E HISTÓRICO DE DISCO
+  Eventos de disco/NTFS ganham a linha "Unidade: ...". O Windows muitas vezes não diz
+  a letra (Ntfs 55 vem com "volume ??", iaStorA 129 só cita \Device\RaidPort0); nesse
+  caso o relatório diz isso e, se o PC tem um só disco físico, que o evento é dele.
+  Bloco "HISTÓRICO DE DISCO/NTFS ANTES DO PERÍODO": erros de disco/NTFS mais antigos que
+  o período escolhido, enquanto o log do Windows ainda os guarda (linha DISCO (HISTÓRICO)
+  no RESUMO). Bad block antigo conta para o veredito de trocar o disco; NTFS 55 antigo
+  pede chkdsk /scan.
+
 BOTÃO TESTAR MEMÓRIA (mdsched)
   Abre o Diagnóstico de Memória do Windows. O teste só roda antes do Windows
   iniciar, então o PC REINICIA (servidor em uso: combinar a parada antes). Na tela

@@ -129,6 +129,7 @@ namespace DiagBIG.Core
             int memTest = hw.Count(o => o.EventId == Config.MemDiagErrorId.ToString());
             int whea = hw.Count(o => Grouping.ShortSource(o.Source).StartsWith("WHEA", StringComparison.OrdinalIgnoreCase));
             int badSectors = disk.Count(Hypotheses.IsBadSector);
+            badSectors += Occ(d, BlockTag.DiskOld).Count(Hypotheses.IsBadSector);
             int ntfs55 = disk.Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && o.EventId == "55");
             bool smartBad = d.Summary.Any(s => s.Label == "SMART" && s.Status == CheckStatus.Atencao);
             int powerLoss = power.Count(o => PowerEvents.Classify(o.Source, o.EventId) == PowerKind.Unexpected && (o.Message ?? "").Contains("QUEDA/CORTE DE ENERGIA"));
