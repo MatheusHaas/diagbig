@@ -338,7 +338,7 @@ namespace DiagBIG.Tests
                          Block(BlockTag.Db, false, DbLine("InnoDB: Database page corruption", "corruption")));
             var plan = ActionPlan.Build(d);
             Assert.StartsWith("VEREDITO: sem defeito grave de disco", plan[0]);
-            int chk = plan.FindIndex(x => x.Contains("chkdsk C: /scan"));
+            int chk = plan.FindIndex(x => x.Contains("chkdsk /scan em C:"));
             int dism = plan.FindIndex(x => x.Contains("DISM /Online /Cleanup-Image /RestoreHealth"));
             int reinst = plan.FindIndex(x => x.Contains("reinstalar o Windows"));
             Assert.True(chk > 0 && chk < dism && dism < reinst);

@@ -106,6 +106,12 @@ namespace DiagBIG.Core
         public string RaidError { get; set; }
         public List<string> Drives { get; } = new List<string>();
         public string DrivesError { get; set; }
+        /// <summary>Letras das unidades onde ficam os datadirs do banco (ex.: "C:").</summary>
+        public List<string> DbDrives { get; } = new List<string>();
+        /// <summary>Criação do ibdata1/datadir do banco (null = não lido).</summary>
+        public DateTime? DbDataCreated { get; set; }
+        /// <summary>Data de instalação do Windows (null = não lida).</summary>
+        public DateTime? OsInstalled { get; set; }
         public List<LogCoverage> LogCoverages { get; } = new List<LogCoverage>();
         public List<Occurrence> LogClearedEvents { get; } = new List<Occurrence>();
         /// <summary>null = verificado. Preenchido = não deu pra verificar o ID 104.</summary>

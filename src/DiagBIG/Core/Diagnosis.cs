@@ -137,10 +137,13 @@ namespace DiagBIG.Core
             // ---------- evidências do banco ----------
             List<string> tables = DamagedTables(all);
             int startupFails = Hypotheses.StartupFailures(db, dbEv);
-            var sysFile = all.Where(IsSystemFile).ToList();
+            // Os eventos do Windows repetem as mesmas linhas do .err: contar pelo .err quando ele tem a evidência, senão pelos eventos.
+            var sysFile = db.Where(IsSystemFile).ToList();
+            if (sysFile.Count == 0) sysFile = dbEv.Where(IsSystemFile).ToList();
             bool memoryErr = db.Any(o => Has(o, MemoryTerms));
             int crashes = db.Count(o => Has(o, CrashTerms));
-            int tableCorrupt = all.Count(o => Has(o, TableCorruptTerms));
+            int tableCorrupt = db.Count(o => Has(o, TableCorruptTerms));
+            if (tableCorrupt == 0) tableCorrupt = dbEv.Count(o => Has(o, TableCorruptTerms));
             var diskFull = all.Where(o => Has(o, DiskFullTerms)).ToList();
             var ioErr = all.Where(o => Has(o, IoErrorTerms)).ToList();
             var locks = all.Where(o => Has(o, FileLockTerms)).ToList();
@@ -223,8 +226,9 @@ namespace DiagBIG.Core
             {
                 var it = new DiagItem { Area = "ESPAÇO, E/S E ACESSO AOS ARQUIVOS" };
                 var parts = new List<string>(); var acts = new List<string>();
-                bool lowSpace = d.Drives.Any(x => x.Contains("POUCO ESPAÇO"));
-                if (diskFull.Count > 0 || lowSpace) { parts.Add("disco cheio/pouco espaço (" + diskFull.Count + " erro(s) do banco)"); acts.Add("liberar espaço no disco do banco; disco cheio quebra tabelas no meio da gravação (veja se as tabelas dos erros foram gravadas nessa hora)"); }
+                var lowDrives = Hypotheses.LowSpaceDrives(d);
+                bool lowSpace = lowDrives.Count > 0;
+                if (diskFull.Count > 0 || lowSpace) { parts.Add("disco cheio/pouco espaço" + (lowSpace ? " em " + string.Join(", ", lowDrives.ToArray()) : "") + " (" + diskFull.Count + " erro(s) do banco)"); acts.Add("liberar espaço no disco do banco; disco cheio quebra tabelas no meio da gravação (veja se as tabelas dos erros foram gravadas nessa hora)"); }
                 if (ioErr.Count > 0) { parts.Add(ioErr.Count + " erro(s) de leitura/gravação no arquivo (E/S)"); acts.Add("erro de E/S do sistema operacional é disco/controladora/rede: tratar como problema de hardware"); }
                 if (locks.Count > 0) { parts.Add(locks.Count + " erro(s) de acesso negado/arquivo em uso"); acts.Add("antivírus, backup ou outro processo mexendo na pasta data; excluir a pasta data do antivírus e do backup de arquivos abertos"); }
                 if (parts.Count > 0) { it.Verdict = DiagVerdict.Provavel; it.Evidence = string.Join("; ", parts.ToArray()) + "."; it.Action = Sentences(acts); }
@@ -261,9 +265,11 @@ namespace DiagBIG.Core
                 if (diskFirst) { parts.AddRange(diskParts); acts.AddRange(diskActs); parts.AddRange(ramParts); acts.AddRange(ramActs); }
                 else { parts.AddRange(ramParts); acts.AddRange(ramActs); parts.AddRange(diskParts); acts.AddRange(diskActs); }
                 if (powerLoss > 0) { parts.Add(powerLoss + " queda(s) de energia"); acts.Add("verificar energia/no-break/fonte"); }
+                int? dbAge = RecentInstall.DbAgeDays(d);
+                if (dbAge.HasValue && dbDamage) { parts.Add("banco instalado " + (dbAge.Value == 0 ? "hoje" : "há " + dbAge.Value + " dia(s)") + " e já corrompendo (datadir novo: não é o dump antigo)"); acts.Add("testar a RAM e trocar o disco ou restaurar em outro disco/servidor"); }
                 if (parts.Count > 0)
                 {
-                    it.Verdict = (bsodRam > 0 || memTest > 0 || badSectors > 0 || smartBad) ? DiagVerdict.Provavel : DiagVerdict.Possivel;
+                    it.Verdict = (bsodRam > 0 || memTest > 0 || badSectors > 0 || smartBad || (dbAge.HasValue && dbDamage && (disk.Count > 0 || ntfs55 > 0))) ? DiagVerdict.Provavel : DiagVerdict.Possivel;
                     it.Evidence = string.Join("; ", parts.ToArray()) + ".";
                     it.Action = Sentences(acts) + " Hardware com defeito corrompe o banco de novo mesmo depois de reinstalar ou restaurar.";
                 }

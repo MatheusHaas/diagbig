@@ -40,6 +40,7 @@ namespace DiagBIG.Windows
             progress("Lendo informações do sistema...");
             d.WindowsVersion = SystemInfo.WindowsVersion();
             try { d.Os = SystemInfo.ReadOs(); } catch (Exception) { }
+            try { d.OsInstalled = SystemInfo.OsInstallDate(); } catch (Exception) { }
             try { d.Drives.AddRange(SystemInfo.FixedDrives()); }
             catch (Exception ex) { d.DrivesError = ex.Message; }
 
@@ -81,8 +82,11 @@ namespace DiagBIG.Windows
             string singleDisk = null;
             try { volumeLetters = SystemInfo.VolumeLetters(); } catch (Exception) { }
             try { singleDisk = SystemInfo.SingleDiskNote(); } catch (Exception) { }
-            foreach (Occurrence o in disk.Occurrences) DiskTarget.Annotate(o, volumeLetters, singleDisk);
+            Dictionary<int, string> diskMap = null;
+            try { diskMap = SystemInfo.DiskMap(); } catch (Exception) { }
+            foreach (Occurrence o in disk.Occurrences) DiskTarget.Annotate(o, volumeLetters, singleDisk, diskMap);
             if (singleDisk != null) disk.Info.Add(singleDisk);
+            foreach (string cited in DiskTarget.CitedDisks(disk.Occurrences, diskMap)) disk.Info.Add(cited);
             if (dumpFailures > 0)
                 disk.Info.Add("Ignorados " + dumpFailures + " evento(s) volmgr " + string.Join("/", Config.DumpFailureIds.Select(i => i.ToString()).ToArray()) +
                               " (falha ao gravar o despejo de memória): consequência de tela azul, não defeito de disco.");
@@ -104,7 +108,7 @@ namespace DiagBIG.Windows
                 return Tuple(list, capped);
             });
             diskOld.Tag = BlockTag.DiskOld;
-            foreach (Occurrence o in diskOld.Occurrences) DiskTarget.Annotate(o, volumeLetters, singleDisk);
+            foreach (Occurrence o in diskOld.Occurrences) DiskTarget.Annotate(o, volumeLetters, singleDisk, diskMap);
             diskOld.Info.Insert(0, "Erros e críticos de disco/NTFS (inclui bad block, disk 7, Ntfs 55) de antes de " + d.Since.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) +
                                    ", enquanto o log do Windows ainda os guarda. Não entram na contagem do período, mas bad block e NTFS corrompido antigos contam para o veredito.");
             if (diskOld.Occurrences.Count > 0) diskSection.Blocks.Add(diskOld);
@@ -302,6 +306,23 @@ namespace DiagBIG.Windows
         {
             var b = new ReportBlock { Title = t.Label, IsEvents = false };
             b.Info.AddRange(t.Info);
+            if (!string.IsNullOrEmpty(t.DataDir))
+            {
+                try
+                {
+                    if (t.DataDir.Length >= 2 && t.DataDir[1] == ':')
+                    {
+                        string letter = t.DataDir.Substring(0, 2).ToUpperInvariant();
+                        if (!d.DbDrives.Contains(letter)) d.DbDrives.Add(letter);
+                    }
+                    string ib = System.IO.Path.Combine(t.DataDir, "ibdata1");
+                    DateTime created = System.IO.File.Exists(ib) ? System.IO.File.GetCreationTime(ib) : System.IO.Directory.GetCreationTime(t.DataDir);
+                    if (!d.DbDataCreated.HasValue || created > d.DbDataCreated.Value) d.DbDataCreated = created;
+                    string line = RecentInstall.InfoLine(d);
+                    if (line != null) b.Info.Add(line);
+                }
+                catch (Exception) { }
+            }
             if (t.Options != null)
             {
                 b.Warnings.AddRange(DbConfigWarnings.Evaluate(t.Options, Hypotheses.RiskReasons(d)));

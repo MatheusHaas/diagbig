@@ -34,6 +34,26 @@ namespace DiagBIG.Core
         /// <summary>Códigos que mandam procurar o disco (CRC, E/S, arquivo corrompido e ilegível).</summary>
         static readonly string[] DiskCodes = { "0x80070017", "0x8007045d", "0x80070570", "0x80070571", "0x8007001f" };
 
+        /// <summary>Códigos do DISM que só dizem "faltou a origem do reparo" (sem internet/ISO): não indicam defeito de disco.</summary>
+        static readonly string[] SourceMissingCodes = { "0x800f081f", "0x800f0915", "0x800f0906", "0x800f0907", "0x800f0950" };
+
+        /// <summary>true se TODAS as falhas de reparo são DISM de origem não encontrada (não é prova de disco).</summary>
+        public static bool OnlySourceMissing(IEnumerable<Occurrence> repair)
+        {
+            bool any = false;
+            foreach (Occurrence o in repair)
+            {
+                any = true;
+                string k = o.SummaryKey ?? "";
+                if (!k.StartsWith(DismKey, StringComparison.Ordinal)) return false;
+                string code = k.Substring(k.LastIndexOf(' ') + 1);
+                bool ok = false;
+                foreach (string c in SourceMissingCodes) if (string.Equals(c, code, StringComparison.OrdinalIgnoreCase)) ok = true;
+                if (!ok) return false;
+            }
+            return any;
+        }
+
         public static bool IsDiskCode(string code)
         {
             foreach (string c in DiskCodes) if (string.Equals(c, code, StringComparison.OrdinalIgnoreCase)) return true;

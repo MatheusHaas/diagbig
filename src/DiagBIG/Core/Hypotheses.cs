@@ -110,11 +110,24 @@ namespace DiagBIG.Core
         public static List<string> RiskReasons(ReportData d)
         {
             var r = new List<string>();
-            int unexpected = Occ(d, BlockTag.Power).Count(o => PowerEvents.IsUnexpected(PowerEvents.Classify(o.Source, o.EventId)));
+            int unexpected = PowerEvents.UnexpectedIncidents(Occ(d, BlockTag.Power));
             if (unexpected > 0) r.Add(unexpected + " desligamento(s) inesperado(s)/tela azul");
             if (Occ(d, BlockTag.Hardware).Any()) r.Add("erros de hardware/memória");
             if (Occ(d, BlockTag.Disk).Any()) r.Add("eventos de disco");
             return r;
+        }
+
+        /// <summary>Unidades "POUCO ESPAÇO" que importam: a do banco e a do Windows (C:). Volume pequeno de recuperação/EFI não conta.</summary>
+        public static List<string> LowSpaceDrives(ReportData d)
+        {
+            var res = new List<string>();
+            foreach (string x in d.Drives)
+            {
+                if (x == null || !x.Contains("POUCO ESPAÇO") || x.Length < 2) continue;
+                string letter = x.Substring(0, 2).ToUpperInvariant();
+                if (letter == "C:" || d.DbDrives.Contains(letter)) res.Add(letter);
+            }
+            return res;
         }
 
         public static List<string> Analyze(ReportData d)
@@ -162,7 +175,8 @@ namespace DiagBIG.Core
             // ---- disco ----
             bool diskEvents = Occ(d, BlockTag.Disk).Any();
             bool smartBad = d.Summary.Any(s => s.Label == "SMART" && s.Status == CheckStatus.Atencao);
-            bool lowSpace = d.Drives.Any(x => x.Contains("POUCO ESPAÇO"));
+            var lowDrives = LowSpaceDrives(d);
+            bool lowSpace = lowDrives.Count > 0;
 
             bool ramEvidence = bsodRam > 0 || memTestFailed > 0 || whea > 0;
 
@@ -225,14 +239,15 @@ namespace DiagBIG.Core
             // Disco com evidência forte (setor ruim, NTFS 55, E/S repetida em volume) vem antes da RAM,
             // a não ser que a RAM tenha prova direta (WHEA ou teste de memória do Windows falhou).
             var repairFails = Occ(d, BlockTag.Repair).ToList();
+            bool repairNotSource = repairFails.Count > 0 && !RepairLogAnalyzer.OnlySourceMissing(repairFails);
             if (repairFails.Count > 0)
             {
                 var repairKeys = repairFails.Select(o => o.SummaryKey).Distinct().ToList();
                 diskR.Add("DISM/SFC já falharam neste PC (" + string.Join("; ", repairKeys.ToArray()) + "): arquivos do Windows corrompidos que o reparo não conseguiu consertar. " +
-                          (diskEvents ? "Junto com os eventos de disco/NTFS, tratar como disco com falha: trocar o disco, não reinstalar no mesmo."
+                          (diskEvents && repairNotSource ? "Junto com os eventos de disco/NTFS, tratar como disco com falha: trocar o disco, não reinstalar no mesmo."
                                       : "Sem evento de disco nos logs: tentar DISM com /Source de um ISO da mesma versão; se falhar de novo, reinstalar o Windows limpo; se a corrupção voltar, suspeitar do disco/RAM."));
             }
-            bool diskStrong = badSectors > 0 || ntfsCorrupt > 0 || diskRetries >= Config.DiskRetryThreshold || (repairFails.Count > 0 && diskEvents);
+            bool diskStrong = badSectors > 0 || ntfsCorrupt > 0 || diskRetries >= Config.DiskRetryThreshold || (repairNotSource && diskEvents);
             if (diskStrong && memTestFailed == 0 && whea == 0) { result.AddRange(diskR); result.AddRange(ramR); }
             else { result.AddRange(ramR); result.AddRange(diskR); }
 
@@ -252,6 +267,10 @@ namespace DiagBIG.Core
                 result.Add("Desligamento sem tela azul e sem botão (" + powerLoss + "x): provável queda de energia, fonte ou no-break. Verificar a energia/no-break; queda de energia corrompe banco.");
             if (powerButton > 0)
                 result.Add("Desligamento forçado pelo botão de energia (" + powerButton + "x): alguém segurou o botão (PC travado?). Verificar o motivo do travamento.");
+
+            // 4b) banco novo já corrompendo
+            string recent = RecentInstall.Cause(d, dbDamaged);
+            if (recent != null) result.Add(recent);
 
             // 5) banco sem causa de hardware
             if (dbDamaged && !ramEvidence && bsodDisk == 0 && !diskEvents && !smartBad && powerLoss == 0)
@@ -293,7 +312,7 @@ namespace DiagBIG.Core
 
             // 7) espaço
             if (lowSpace)
-                result.Add("Pouco espaço em disco (veja UNIDADES): liberar espaço; disco cheio derruba o banco e o Windows.");
+                result.Add("Pouco espaço em disco na unidade " + string.Join(", ", lowDrives.ToArray()) + " (veja UNIDADES): liberar espaço; disco cheio derruba o banco e o Windows.");
 
             return result;
         }

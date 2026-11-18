@@ -77,9 +77,20 @@ namespace DiagBIG.Tests
         }
 
         [Fact]
-        public void DismFailed_WithDiskEvents_MeansReplaceDisk()
+        public void DismSourceMissing_WithFewDiskEvents_IsNotDiskProof()
         {
+            // 0x800f0915 = faltou a origem do reparo (ISO/internet): não prova defeito de disco.
             var d = Data(RepairBlock(Dism), DiskBlock());
+            var plan = ActionPlan.Build(d);
+            Assert.StartsWith("VEREDITO: sem defeito grave de disco", plan[0]);
+            Assert.DoesNotContain(Hypotheses.Analyze(d), x => x.StartsWith("DISM/SFC já falharam") && x.Contains("trocar o disco"));
+        }
+
+        [Fact]
+        public void DismDiskLikeFailure_WithDiskEvents_MeansReplaceDisk()
+        {
+            string log = "2026-11-16 11:41:10, Error                 DISM   DISM Package Manager: PID=1 failed (hr:0x80070002)\r\n";
+            var d = Data(RepairBlock(log), DiskBlock());
             var plan = ActionPlan.Build(d);
             Assert.StartsWith("VEREDITO: DISCO COM DEFEITO GRAVE", plan[0]);
             Assert.Contains("DISM/SFC já falharam aqui", plan[0]);

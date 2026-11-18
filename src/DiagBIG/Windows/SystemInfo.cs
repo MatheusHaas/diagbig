@@ -161,6 +161,53 @@ namespace DiagBIG.Windows
             catch (Exception) { return null; }
         }
 
+        /// <summary>Data de instalação do Windows (Win32_OperatingSystem.InstallDate).</summary>
+        public static DateTime? OsInstallDate()
+        {
+            using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT InstallDate FROM Win32_OperatingSystem", Options()))
+                foreach (ManagementObject mo in s.Get())
+                    using (mo)
+                    {
+                        string v = mo["InstallDate"] as string;
+                        if (!string.IsNullOrEmpty(v)) return ManagementDateTimeConverter.ToDateTime(v);
+                    }
+            return null;
+        }
+
+        /// <summary>Número do disco físico (Disco 0, 1...) → "MODELO, 953,9 GB, IDE; unidades C:, D:".</summary>
+        public static Dictionary<int, string> DiskMap()
+        {
+            var map = new Dictionary<int, string>();
+            using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Index, DeviceID, Model, Size, InterfaceType FROM Win32_DiskDrive", Options()))
+                foreach (ManagementObject disk in s.Get())
+                    using (disk)
+                    {
+                        int idx = Convert.ToInt32(disk["Index"], CultureInfo.InvariantCulture);
+                        string dev = Convert.ToString(disk["DeviceID"], CultureInfo.InvariantCulture) ?? "";
+                        object size = disk["Size"];
+                        var letters = new List<string>();
+                        try
+                        {
+                            string q1 = "ASSOCIATORS OF {Win32_DiskDrive.DeviceID='" + dev.Replace("\\", "\\\\") + "'} WHERE AssocClass=Win32_DiskDriveToDiskPartition";
+                            using (var parts = new ManagementObjectSearcher(@"root\cimv2", q1, Options()))
+                                foreach (ManagementObject part in parts.Get())
+                                    using (part)
+                                    {
+                                        string q2 = "ASSOCIATORS OF {Win32_DiskPartition.DeviceID='" + Convert.ToString(part["DeviceID"], CultureInfo.InvariantCulture) + "'} WHERE AssocClass=Win32_LogicalDiskToPartition";
+                                        using (var lds = new ManagementObjectSearcher(@"root\cimv2", q2, Options()))
+                                            foreach (ManagementObject ld in lds.Get())
+                                                using (ld) letters.Add(Convert.ToString(ld["DeviceID"], CultureInfo.InvariantCulture));
+                                    }
+                        }
+                        catch (Exception) { }
+                        map[idx] = (Convert.ToString(disk["Model"], CultureInfo.InvariantCulture) ?? "").Trim() +
+                                   (size != null ? ", " + ReportBuilder.FormatBytes(Convert.ToInt64(size, CultureInfo.InvariantCulture)) : "") +
+                                   ", " + Convert.ToString(disk["InterfaceType"], CultureInfo.InvariantCulture) +
+                                   "; unidades: " + (letters.Count > 0 ? string.Join(", ", letters.ToArray()) : "nenhuma com letra");
+                    }
+            return map;
+        }
+
         public static List<string> FixedDrives()
         {
             var list = new List<string>();
@@ -172,7 +219,9 @@ namespace DiagBIG.Windows
                     long free = d.AvailableFreeSpace, total = d.TotalSize;
                     int pct = total > 0 ? (int)(free * 100 / total) : 0;
                     string s = d.Name.TrimEnd('\\') + " " + ReportBuilder.FormatBytes(free) + " livres de " + ReportBuilder.FormatBytes(total) + " (" + pct + "%)";
-                    if (pct < 10 || free < 5L * 1024 * 1024 * 1024) s += "  <<< POUCO ESPAÇO";
+                    // Volume pequeno (recuperação, EFI, reservado, < 1 GB) fica quase cheio por natureza: não é alerta.
+                    if (total >= 1024L * 1024 * 1024 && (pct < 10 || free < 5L * 1024 * 1024 * 1024)) s += "  <<< POUCO ESPAÇO";
+                    else if (total < 1024L * 1024 * 1024) s += "  (volume pequeno, não conta como pouco espaço)";
                     list.Add(s);
                 }
                 catch (Exception ex) { list.Add(d.Name.TrimEnd('\\') + " erro ao ler: " + ex.Message); }

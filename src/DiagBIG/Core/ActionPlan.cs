@@ -58,8 +58,13 @@ namespace DiagBIG.Core
                                                   RepairLogAnalyzer.IsDiskCode(o.SummaryKey.Substring(o.SummaryKey.LastIndexOf(' ') + 1)));
             bool dismFailed = repair.Any(o => o.SummaryKey != null && o.SummaryKey.StartsWith(RepairLogAnalyzer.DismKey, StringComparison.Ordinal));
 
+            // DISM "origem não encontrada" (0x800f081f e parentes) é falta de ISO/internet, não prova de disco.
+            bool repairNotSource = repairFailed && !RepairLogAnalyzer.OnlySourceMissing(repair);
+            string recentCause = RecentInstall.Cause(d, dbDamaged);
+            bool recentDamaged = recentCause != null;
+            int? dbAge = RecentInstall.DbAgeDays(d);
             bool fatalDisk = badSectors > 0 || ntfs > 0 || smartBad || retries >= Config.DiskRetryThreshold ||
-                             repairDiskCode || (repairFailed && disk.Count > 0);
+                             repairDiskCode || (repairNotSource && disk.Count > 0) || (recentDamaged && disk.Count > 0);
             var clockEv = Occ(d, BlockTag.Clock).ToList();
             bool clockBad = clockEv.Count > 0;
             DateTime? clockLast = clockEv.Where(o => o.Time.HasValue).Select(o => o.Time).OrderByDescending(t => t).FirstOrDefault();
@@ -72,6 +77,11 @@ namespace DiagBIG.Core
             var risky = new List<string>();
             if (dwOff) risky.Add("innodb_doublewrite=ON (hoje OFF; ou remover a linha)");
             if (flushBad != null) risky.Add("innodb_flush_log_at_trx_commit=1 (hoje " + flushBad + ")");
+            var letters = d.Drives.Where(x => x != null && x.Length >= 2 && char.IsLetter(x[0]) && x[1] == ':').Select(x => x.Substring(0, 2).ToUpperInvariant()).Distinct().ToList();
+            string chkTargets = letters.Count > 0 ? string.Join(" e ", letters.ToArray()) : "C: (e D: se o banco estiver lá)";
+            var hoje = new List<string>();
+            if (dwOff) hoje.Add("innodb_doublewrite está OFF");
+            if (flushBad != null) hoje.Add("innodb_flush_log_at_trx_commit está " + flushBad);
             string powerLine = null;
             if (risky.Count > 0)
                 powerLine = "ATENÇÃO MY.INI" + (unexpected > 0 ? " (" + unexpected + " desligamento(s)/queda(s) de energia no período)" : "") +
@@ -102,6 +112,7 @@ namespace DiagBIG.Core
                 if (smartBad) why.Add("SMART em atenção");
                 if (retries >= Config.DiskRetryThreshold) why.Add("disco com E/S repetida");
                 if (repairDiskCode) why.Add("reparo do Windows falhou por disco");
+                if (recentDamaged && disk.Count > 0) why.Add("banco recém-instalado já corrompendo, com eventos de disco");
                 if (fatalDisk)
                 {
                     n1.Add("AÇÃO: Acione a equipe técnica para TROCAR O SERVIDOR/DISCO e reinstalar. Não reinstalar neste disco.");
@@ -153,7 +164,8 @@ namespace DiagBIG.Core
             if (ntfs > 0) ev.Add(ntfs + "x NTFS corrompido (Ntfs 55/98)");
             if (smartBad) ev.Add("SMART em atenção");
             if (retries >= Config.DiskRetryThreshold) ev.Add(retries + "x disk 153 (E/S repetida)");
-            if (repairFailed) ev.Add("DISM/SFC já falharam aqui (" + string.Join(", ", repairCodes.Select(c => c.Replace(RepairLogAnalyzer.DismKey + " ", "")).ToArray()) + ")");
+            if (recentDamaged && disk.Count > 0) ev.Add("banco instalado " + (dbAge.Value == 0 ? "hoje" : "há " + dbAge.Value + " dia(s)") + " já corrompendo, junto com " + disk.Count + " evento(s) de disco");
+            if (repairNotSource) ev.Add("DISM/SFC já falharam aqui (" + string.Join(", ", repairCodes.Select(c => c.Replace(RepairLogAnalyzer.DismKey + " ", "")).ToArray()) + ")");
 
             bool running = d.DbServiceRunning == true;
             bool forceRec = Hypotheses.ForceRecoveryOn(d);
@@ -193,7 +205,7 @@ namespace DiagBIG.Core
                                   "Se não der certo, ou se precisar de force 3 ou mais: EQUIPE TÉCNICA (dump, reinstalação ou troca de servidor)."));
                 if (ramSuspect)
                     plan.Add(step("RAM primeiro: testar com MemTest86/MemTest86+ (pen drive, várias passadas, pente a pente) ou o botão Testar memória (mdsched) > Estendido. Reparar Windows ou banco com RAM defeituosa não adianta: volta a corromper."));
-                plan.Add(step("chkdsk C: /scan (e D: se o banco estiver lá); se achar erro, chkdsk /f na janela de manutenção. Se o chkdsk achar setor ruim ou voltar com erro, mudar para a rota de TROCAR O DISCO."));
+                plan.Add(step("chkdsk /scan em " + chkTargets + "; se achar erro, chkdsk /f na janela de manutenção. Se o chkdsk achar setor ruim ou voltar com erro, mudar para a rota de TROCAR O DISCO."));
                 if (dismFailed)
                     plan.Add(step("O DISM já falhou aqui (" + string.Join(", ", repairCodes.ToArray()) + ") e os logs não mostram defeito de disco. Tentar UMA vez com origem local: montar o ISO da MESMA versão/build do Windows e rodar " +
                                   "DISM /Online /Cleanup-Image /RestoreHealth /Source:wim:X:\\sources\\install.wim:1 /LimitAccess (X: = letra do ISO; se for install.esd, trocar wim por esd), depois sfc /scannow e reiniciar. " +
@@ -210,7 +222,7 @@ namespace DiagBIG.Core
                 plan.Add(step("Data/hora: o Windows teve a data alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ". O técnico da farmácia deve acertar data/hora (Windows e BIOS) e, se voltar a errar, trocar a bateria da placa-mãe (CR2032) antes de subir o banco; com a data errada ele não sobe."));
             if (unexpected > 0)
                 plan.Add(step("Energia: " + unexpected + " desligamento(s) inesperado(s). Usar no-break (nobreak) com bateria boa no servidor; queda de energia corrompe banco."));
-            plan.Add(step("my.ini: innodb_doublewrite DEVE ficar ON (padrão; tirar a linha OFF) e innodb_flush_log_at_trx_commit=1" + (risky.Count > 0 ? " (hoje: " + string.Join(" e ", risky.ToArray()) + ")" : "") +
+            plan.Add(step("my.ini: innodb_doublewrite DEVE ficar ON (padrão; tirar a linha OFF) e innodb_flush_log_at_trx_commit=1" + (hoje.Count > 0 ? ". Situação hoje: " + string.Join("; ", hoje.ToArray()) : "") +
                           "; tirar innodb_force_recovery depois da manutenção. Ajustar e REINICIAR o serviço do MariaDB depois que o reparo for concluído com sucesso, para evitar novas perdas de dados. Ver os AVISOS da seção do banco."));
             return plan;
         }
