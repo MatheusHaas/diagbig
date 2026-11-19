@@ -129,7 +129,9 @@ $VhdArq = "C:\diagbig-vhd50.vhd"
 function Vhd-Criar {
     if (Test-Path $VhdArq) { Write-Host "O VHD de 50 MB ja existe: $VhdArq"; return }
     $letra = $null
-    foreach ($n in 68..90) { $l = [string][char]$n; if (-not (Test-Path ($l + ":\"))) { $letra = $l; break } }
+    # Letras em uso inclui leitor de CD/DVD vazio (Test-Path dá falso nele); procura de R a Z.
+    $usadas = @([System.IO.DriveInfo]::GetDrives() | ForEach-Object { $_.Name.Substring(0, 1).ToUpper() })
+    foreach ($n in 82..90) { $l = [string][char]$n; if ($usadas -notcontains $l) { $letra = $l; break } }
     if (-not $letra) { Write-Host "Sem letra livre." -ForegroundColor Red; return }
     $dp = @("create vdisk file=""$VhdArq"" maximum=50 type=fixed", "select vdisk file=""$VhdArq""", "attach vdisk",
             "create partition primary", "format fs=ntfs quick label=DIAGBIG50", "assign letter=$letra")
