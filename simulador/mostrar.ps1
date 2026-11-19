@@ -31,3 +31,7 @@ if ($u) { $u } else { "(nenhuma linha Unidade:)" }
 Write-Host ""
 Write-Host "================ RELOGIO / ULTIMO TESTE DE MEMORIA ================" -ForegroundColor Cyan
 Select-String -Path $Arquivo -Encoding UTF8 -Pattern 'ATEN..O DATA/HORA|ATEN..O MY.INI|Último teste de memória|RELÓGIO DO WINDOWS|Conferir também a data|Orientar o técnico' | ForEach-Object { $_.Line.Trim() }
+
+Write-Host ""
+Write-Host "================ CORRECOES POS-1.6.7 (teste5) ================" -ForegroundColor Cyan
+Select-String -Path $Arquivo -Encoding UTF8 -Pattern 'DISCO COM ERRO|DISCO F.SICO|volume pequeno|POUCO ESPA|Banco criado em|BANCO NOVO|banco instalado|incidente\(s\)|Situa..o hoje|n.o indica disco|o PC tem s. um' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique

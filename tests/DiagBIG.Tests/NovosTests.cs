@@ -112,6 +112,10 @@ namespace DiagBIG.Tests
             var d = Data(Block(BlockTag.Disk, true, Ev("disk", 153, "A operação de ES foi repetida.")), rep);
             Assert.DoesNotContain("DISCO COM DEFEITO GRAVE", ActionPlan.Build(d)[0]);
             Assert.Contains("não indica disco", RepairLogAnalyzer.Describe("0x80070057"));
+            // a causa não pode dizer "sem evento de disco" quando há evento de disco
+            var causa = Hypotheses.Analyze(d).First(x => x.StartsWith("DISM/SFC já falharam"));
+            Assert.DoesNotContain("Sem evento de disco", causa);
+            Assert.DoesNotContain("trocar o disco", causa);
         }
 
         [Fact]

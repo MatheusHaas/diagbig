@@ -243,9 +243,13 @@ namespace DiagBIG.Core
             if (repairFails.Count > 0)
             {
                 var repairKeys = repairFails.Select(o => o.SummaryKey).Distinct().ToList();
-                diskR.Add("DISM/SFC já falharam neste PC (" + string.Join("; ", repairKeys.ToArray()) + "): arquivos do Windows corrompidos que o reparo não conseguiu consertar. " +
-                          (diskEvents && repairNotSource ? "Junto com os eventos de disco/NTFS, tratar como disco com falha: trocar o disco, não reinstalar no mesmo."
-                                      : "Sem evento de disco nos logs: tentar DISM com /Source de um ISO da mesma versão; se falhar de novo, reinstalar o Windows limpo; se a corrupção voltar, suspeitar do disco/RAM."));
+                string what = repairNotSource ? "arquivos do Windows corrompidos que o reparo não conseguiu consertar. "
+                                              : "o código do DISM só indica que faltou a origem do reparo ou que o comando foi digitado errado, não defeito de disco. ";
+                string todo = diskEvents && repairNotSource
+                    ? "Junto com os eventos de disco/NTFS, tratar como disco com falha: trocar o disco, não reinstalar no mesmo."
+                    : (diskEvents ? "Os eventos de disco acima são tratados à parte. Para o Windows: refazer o DISM com a sintaxe certa e, se pedir origem, usar /Source com um ISO da mesma versão."
+                                  : "Sem evento de disco nos logs: tentar DISM com /Source de um ISO da mesma versão; se falhar de novo, reinstalar o Windows limpo; se a corrupção voltar, suspeitar do disco/RAM.");
+                diskR.Add("DISM/SFC já falharam neste PC (" + string.Join("; ", repairKeys.ToArray()) + "): " + what + todo);
             }
             bool diskStrong = badSectors > 0 || ntfsCorrupt > 0 || diskRetries >= Config.DiskRetryThreshold || (repairNotSource && diskEvents);
             if (diskStrong && memTestFailed == 0 && whea == 0) { result.AddRange(diskR); result.AddRange(ramR); }

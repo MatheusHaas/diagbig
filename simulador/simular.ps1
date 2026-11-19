@@ -16,8 +16,8 @@ function Achar-Err {
     return $null
 }
 
-function Evento($fonte, $id, $msg) {
-    Write-EventLog -LogName System -Source $fonte -EventId $id -EntryType Error -Message $msg
+function Evento($fonte, $id, $msg, $tipo = "Error") {
+    Write-EventLog -LogName System -Source $fonte -EventId $id -EntryType $tipo -Message $msg
     Write-Host "Evento gravado: $fonte $id"
 }
 
@@ -111,6 +111,71 @@ function Relogio-Saltar {
     Write-Host ("Relogio de volta: " + (Get-Date))
 }
 
+# 14: disk 153 (E/S repetida) citando "Disco 0": o relatorio deve mostrar qual disco (modelo e unidades).
+function Disco153 {
+    for ($i = 0; $i -lt 3; $i++) {
+        Evento "disk" 153 "A operacao de ES no endereco de bloco logico 0xde94440 para o Disco 0 (nome PDO: \Device\00000041) foi repetida." "Warning"
+    }
+}
+
+# 15: DISM digitado errado (opcao invalida): erro 87 / 0x80070057, que NAO indica disco.
+function Dism-Errado {
+    Write-Host "Rodando DISM com opcao errada (de proposito) ..."
+    & dism.exe /Online /Cleanup-Image /RestoreHealt 2>&1 | Select-Object -Last 3 | ForEach-Object { Write-Host $_ }
+}
+
+# 16/17: volume NTFS pequeno (50 MB) em um VHD, com letra livre. O relatorio nao deve alertar POUCO ESPACO nele.
+$VhdArq = "C:\diagbig-vhd50.vhd"
+function Vhd-Criar {
+    if (Test-Path $VhdArq) { Write-Host "O VHD de 50 MB ja existe: $VhdArq"; return }
+    $letra = $null
+    foreach ($n in 68..90) { $l = [string][char]$n; if (-not (Test-Path ($l + ":\"))) { $letra = $l; break } }
+    if (-not $letra) { Write-Host "Sem letra livre." -ForegroundColor Red; return }
+    $dp = @("create vdisk file=""$VhdArq"" maximum=50 type=fixed", "select vdisk file=""$VhdArq""", "attach vdisk",
+            "create partition primary", "format fs=ntfs quick label=DIAGBIG50", "assign letter=$letra")
+    $tmp = Join-Path $env:TEMP "diagbig-dp.txt"
+    Set-Content -Path $tmp -Value $dp -Encoding ASCII
+    & diskpart.exe /s $tmp | Out-Null
+    Write-Host "Volume de 50 MB criado em ${letra}: (arquivo $VhdArq)"
+}
+function Vhd-Remover {
+    if (-not (Test-Path $VhdArq)) { Write-Host "Nada para remover."; return }
+    $tmp = Join-Path $env:TEMP "diagbig-dp.txt"
+    Set-Content -Path $tmp -Value @("select vdisk file=""$VhdArq""", "detach vdisk") -Encoding ASCII
+    & diskpart.exe /s $tmp | Out-Null
+    Remove-Item $VhdArq -Force -ErrorAction SilentlyContinue
+    Write-Host "Volume de 50 MB removido."
+}
+
+# 18/19: faz o banco parecer recem-instalado (data de criacao do ibdata1 = agora) e volta o valor original.
+function Achar-Ibdata {
+    $e = Achar-Err
+    if (-not $e) { return $null }
+    $p = Join-Path (Split-Path $e) "ibdata1"
+    if (Test-Path $p) { return $p }
+    return $null
+}
+function Banco-Novo {
+    $ib = Achar-Ibdata
+    if (-not $ib) { Write-Host "NAO ACHEI o ibdata1." -ForegroundColor Red; return }
+    Com-Servico {
+        $bak = $ib + ".criacao-diagbig"
+        if (-not (Test-Path $bak)) { Set-Content -Path $bak -Value (Get-Item $ib).CreationTime.ToString("o") -Encoding ASCII }
+        (Get-Item $ib).CreationTime = Get-Date
+        Write-Host ("ibdata1 agora com criacao em " + (Get-Item $ib).CreationTime)
+    }
+}
+function Banco-Novo-Restaurar {
+    $ib = Achar-Ibdata
+    if (-not $ib -or -not (Test-Path ($ib + ".criacao-diagbig"))) { Write-Host "Nada para restaurar."; return }
+    Com-Servico {
+        $orig = [datetime]::Parse((Get-Content ($ib + ".criacao-diagbig") -Raw).Trim(), $null, [System.Globalization.DateTimeStyles]::RoundtripKind)
+        (Get-Item $ib).CreationTime = $orig
+        Remove-Item ($ib + ".criacao-diagbig") -Force
+        Write-Host "Data de criacao do ibdata1 restaurada: $orig"
+    }
+}
+
 switch ($Cenario) {
  1 { Evento "disk" 7 "O dispositivo \Device\Harddisk0\DR0 tem um bloco invalido (bad block)." }
  2 { Evento "Ntfs" 55 "Corrupcao detectada na estrutura do sistema de arquivos, no volume ??." }
@@ -144,5 +209,12 @@ switch ($Cenario) {
  11 { Ini-Restaurar }
  12 { Relogio-Saltar }
  13 { Evento "Ntfs" 55 "Corrupcao detectada na estrutura do sistema de arquivos, no volume D:." }
+ 14 { Disco153 }
+ 15 { Dism-Errado }
+ 16 { Vhd-Criar }
+ 17 { Vhd-Remover }
+ 18 { Banco-Novo }
+ 19 { Banco-Novo-Restaurar }
+ 20 { Evento "disk" 7 "O dispositivo tem um bloco invalido (bad block)." }
  default { Write-Host "Cenario invalido." }
 }

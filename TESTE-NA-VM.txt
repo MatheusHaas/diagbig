@@ -145,6 +145,19 @@ N) ROTEIRO RAPIDO COM O SIMULADOR (1.6.7) - pasta simulador\, SIMULAR.bat como A
    Janela: opcao G abre o DiagBIG com janela: botao "Testar memoria (mdsched)" (responder Nao, ou Sim e fechar o mdsched) e
      "Verificar disco". Obs.: bad block e Ntfs 55 antigos (fora do periodo) nao tem como simular: Write-EventLog grava com a data de agora.
 
+N) TESTE COMPLETO DE UMA VEZ (exe teste5) - simulador\SIMULAR.bat como ADMINISTRADOR, opcao T
+   A opcao T roda os cenarios 14, 15, 16, 18, 6, 10 e 12 em sequencia, coleta sem janela, mostra o resultado e restaura tudo
+   (11, 9, 19 e 17). Leva alguns minutos (o banco e parado e iniciado varias vezes). Depois copie o TXT mais recente de
+   DiagBIG_relatorios para o compartilhado. Esperado no relatorio:
+     14  "DISCO COM ERRO: Disco 0 = <modelo>..." e, no evento, "Unidade: DISCO FISICO 0 = ...".
+     15  DISM com "0x80070057 ... nao indica disco" (se o DISM nao gravar nada no dism.log, anote: nao e falha do DiagBIG).
+     16  UNIDADES com a letra nova "(volume pequeno, nao conta como pouco espaco)", sem "POUCO ESPACO".
+     18+6+14  "Banco criado em .: <hoje>", causa "BANCO NOVO JA CORROMPENDO" e VEREDITO "DISCO COM DEFEITO GRAVE (banco instalado hoje
+              ja corrompendo, junto com 3 evento(s) de disco)".
+     10  avisos de my.ini e passo final "Situacao hoje: innodb_doublewrite esta OFF; innodb_flush_log_at_trx_commit esta 2".
+     12  bloco RELOGIO DO WINDOWS com 2 eventos (no N1 o aviso de data/hora fica em segundo plano porque o disco tem prioridade).
+   As opcoes 14 a 20 tambem rodam separadas; a 20 (bad block sem \Device\Harddisk) testa o "o PC tem so um: <modelo>".
+
 N) Correções depois da 1.6.7 (exe teste3) - conferir na VM
    - Qual disco: Write-EventLog -LogName System -Source disk -EventId 153 -EntryType Warning -Message "A operação de ES no endereço de bloco
      lógico 0xde94440 para o Disco 0 (nome PDO: \Device\00000041) foi repetida."  Esperado no bloco EVENTOS DE DISCO/NTFS:
