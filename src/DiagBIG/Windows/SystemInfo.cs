@@ -140,6 +140,24 @@ namespace DiagBIG.Windows
         }
 
         /// <summary>Se o PC tem um único disco físico (não USB), diz quais unidades estão nele; senão null.</summary>
+        /// <summary>Modelo do único disco físico (não USB); null se há mais de um ou se não deu para ler.</summary>
+        public static string SingleDiskModel()
+        {
+            try
+            {
+                var models = new List<string>();
+                using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Model, InterfaceType FROM Win32_DiskDrive", Options()))
+                    foreach (ManagementObject mo in s.Get())
+                        using (mo)
+                        {
+                            if (string.Equals(Convert.ToString(mo["InterfaceType"], CultureInfo.InvariantCulture), "USB", StringComparison.OrdinalIgnoreCase)) continue;
+                            models.Add((Convert.ToString(mo["Model"], CultureInfo.InvariantCulture) ?? "").Trim());
+                        }
+                return models.Count == 1 ? models[0] : null;
+            }
+            catch (Exception) { return null; }
+        }
+
         public static string SingleDiskNote()
         {
             try

@@ -171,6 +171,12 @@ N) Correções depois da 1.6.7 (exe teste3) - conferir na VM
      está 2", sem o texto do aviso repetido dentro de parênteses.
    - Corrupção no .err: "linha(s) apontando para o tablespace de sistema" bate com o agrupamento do .err (20x = 20), sem somar os eventos
      MariaDB 100 do Windows que repetem as mesmas linhas.
+   - RESUMO, linha DESLIGAMENTOS INESPERADOS: conta incidentes ("9 incidente(s) (EventLog 6008: 9x, Kernel-Power 41: 9x; 18 eventos
+     somados)"), o mesmo número do agrupamento e de LIGA/DESLIGA.
+   - DISM com 0x80070057 (parâmetro incorreto, ex.: "DISM /Online /Cleanup-Image /RestoreHeal" digitado errado) aparece com a explicação
+     "não indica disco" e não força mais o veredito de trocar o disco nem a causa "DISM/SFC já falharam ... trocar o disco".
+   - Bad block de Write-EventLog (sem \Device\Harddisk no texto) em VM de disco único: o motivo diz "o evento não cita o disco, mas o PC
+     tem só um: <modelo>" em vez de "disco não identificado no evento".
    - chkdsk no O QUE FAZER cita só as unidades que existem ("chkdsk /scan em C: e D:"), não manda mais conferir D: que não existe.
 
 N) Novidades da 1.6.6 (conferir na VM)

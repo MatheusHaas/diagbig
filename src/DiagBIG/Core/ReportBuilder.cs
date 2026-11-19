@@ -91,6 +91,13 @@ namespace DiagBIG.Core
             {
                 item.Status = CheckStatus.Atencao;
                 item.Text = CountText(occ, isEvents);
+                if (blocks.Any(b => b.Tag == BlockTag.Power))
+                {
+                    // 6008 e Kernel-Power 41 do mesmo momento são 1 incidente: o resumo usa o mesmo número do resto do relatório.
+                    int inc = PowerEvents.UnexpectedIncidents(occ);
+                    int p = item.Text.IndexOf(" (", StringComparison.Ordinal);
+                    if (inc > 0 && p > 0) item.Text = inc + " incidente(s)" + item.Text.Substring(p).Replace("), ", "; " + occ.Count + " eventos somados), ");
+                }
                 if (failed.Count > 0) item.Text += "; parte NÃO VERIFICADA: " + failText;
             }
             else if (failed.Count > 0)

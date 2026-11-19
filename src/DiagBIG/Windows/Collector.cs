@@ -82,6 +82,7 @@ namespace DiagBIG.Windows
             string singleDisk = null;
             try { volumeLetters = SystemInfo.VolumeLetters(); } catch (Exception) { }
             try { singleDisk = SystemInfo.SingleDiskNote(); } catch (Exception) { }
+            try { d.SingleDiskModel = SystemInfo.SingleDiskModel(); } catch (Exception) { }
             Dictionary<int, string> diskMap = null;
             try { diskMap = SystemInfo.DiskMap(); } catch (Exception) { }
             foreach (Occurrence o in disk.Occurrences) DiskTarget.Annotate(o, volumeLetters, singleDisk, diskMap);

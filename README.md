@@ -38,7 +38,7 @@ O relatório vai para `DiagBIG_relatorios\DiagBIG_<PC>_<aaaaMMdd_HHmmss>.txt`, a
 ### Compilar (Ubuntu ou qualquer SO com .NET SDK 8)
 
 ```bash
-dotnet test                                          # 199 testes da lógica (net8.0)
+dotnet test                                          # 202 testes da lógica (net8.0)
 dotnet build src/DiagBIG/DiagBIG.csproj -c Release   # gera src/DiagBIG/bin/Release/net40/DiagBIG.exe
 ```
 

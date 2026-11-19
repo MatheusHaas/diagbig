@@ -95,10 +95,10 @@ namespace DiagBIG.Core
         }
 
         /// <summary>"\Device\Harddisk0\DR0 (último em 12/09/2026)" por disco citado nos bad blocks.</summary>
-        public static string BadSectorWhere(IList<Occurrence> bad)
+        public static string BadSectorWhere(IList<Occurrence> bad, string singleDiskModel = null)
         {
             var parts = new List<string>();
-            foreach (var g in bad.GroupBy(o => DiskTarget.DiskId(o.Message) ?? "disco não identificado no evento"))
+            foreach (var g in bad.GroupBy(o => DiskTarget.DiskId(o.Message) ?? (string.IsNullOrEmpty(singleDiskModel) ? "disco não identificado no evento" : "o evento não cita o disco, mas o PC tem só um: " + singleDiskModel)))
             {
                 DateTime? last = g.Where(o => o.Time.HasValue).Select(o => o.Time).OrderByDescending(t => t).FirstOrDefault();
                 parts.Add(g.Key + " (" + g.Count() + "x" + (last.HasValue ? ", último em " + last.Value.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture) : "") + ")");
@@ -206,7 +206,7 @@ namespace DiagBIG.Core
             var recentBad = RecentBadSectors(d);
             int badSectors = recentBad.Count;
             if (badSectors > 0)
-                diskR.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s) nos últimos " + Config.BadBlockRecentDays / 30 + " meses; " + BadSectorWhere(recentBad) + "): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
+                diskR.Add("Disco com setor defeituoso (bad block, " + badSectors + " ocorrência(s) nos últimos " + Config.BadBlockRecentDays / 30 + " meses; " + BadSectorWhere(recentBad, d.SingleDiskModel) + "): acionar o técnico e/ou efetuar a troca do disco/servidor. " +
                            "Fazer backup agora. " + (smartBad ? "" : "O SMART não acusou falha, mas SMART OK não descarta o disco: o setor ruim pode já ter sido remapeado ou o disco estar atrás de RAID. ") +
                            "chkdsk /r não conserta disco que está morrendo.");
             int ntfsCorrupt = Occ(d, BlockTag.Disk).Count(o => string.Equals(Grouping.ShortSource(o.Source), "Ntfs", StringComparison.OrdinalIgnoreCase) && o.EventId == "55");
@@ -239,7 +239,7 @@ namespace DiagBIG.Core
             // Disco com evidência forte (setor ruim, NTFS 55, E/S repetida em volume) vem antes da RAM,
             // a não ser que a RAM tenha prova direta (WHEA ou teste de memória do Windows falhou).
             var repairFails = Occ(d, BlockTag.Repair).ToList();
-            bool repairNotSource = repairFails.Count > 0 && !RepairLogAnalyzer.OnlySourceMissing(repairFails);
+            bool repairNotSource = repairFails.Count > 0 && !RepairLogAnalyzer.OnlyNonDisk(repairFails);
             if (repairFails.Count > 0)
             {
                 var repairKeys = repairFails.Select(o => o.SummaryKey).Distinct().ToList();

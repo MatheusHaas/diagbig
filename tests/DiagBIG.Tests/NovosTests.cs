@@ -89,5 +89,37 @@ namespace DiagBIG.Tests
             var cited = DiskTarget.CitedDisks(new[] { new Occurrence { Message = "para o Disco 0 (nome PDO" } }, map);
             Assert.Contains("DISCO COM ERRO: Disco 0 = REAPER C", cited[0]);
         }
+
+        [Fact]
+        public void ResumoDeDesligamentos_ContaIncidentes_NaoEventos()
+        {
+            var b = new ReportBlock { Tag = BlockTag.Power, IsEvents = true };
+            for (int i = 0; i < 3; i++)
+            {
+                DateTime t = new DateTime(2026, 11, 14, 4 + i, 0, 0);
+                b.Occurrences.Add(new Occurrence { Time = t, Source = "Microsoft-Windows-Kernel-Power", EventId = "41", Message = "x", SummaryKey = "Kernel-Power 41" });
+                b.Occurrences.Add(new Occurrence { Time = t.AddSeconds(30), Source = "EventLog", EventId = "6008", Message = "x", SummaryKey = "EventLog 6008" });
+            }
+            string txt = ReportBuilder.Summarize("DESLIGAMENTOS INESPERADOS", new[] { b }).Text;
+            Assert.StartsWith("3 incidente(s)", txt);
+            Assert.Contains("6 eventos somados", txt);
+        }
+
+        [Fact]
+        public void DismParametroIncorreto_NaoEhProvaDeDisco()
+        {
+            var rep = Block(BlockTag.Repair, false, new Occurrence { Time = T, Source = "DISM", Message = "DISM falhou", SummaryKey = RepairLogAnalyzer.DismKey + " 0x80070057" });
+            var d = Data(Block(BlockTag.Disk, true, Ev("disk", 153, "A operação de ES foi repetida.")), rep);
+            Assert.DoesNotContain("DISCO COM DEFEITO GRAVE", ActionPlan.Build(d)[0]);
+            Assert.Contains("não indica disco", RepairLogAnalyzer.Describe("0x80070057"));
+        }
+
+        [Fact]
+        public void BadBlockSemDisco_ComDiscoUnico_CitaOModelo()
+        {
+            var bad = new List<Occurrence> { new Occurrence { Time = T, Message = "bloco inválido" } };
+            Assert.Contains("o PC tem só um: VBOX HARDDISK", Hypotheses.BadSectorWhere(bad, "VBOX HARDDISK"));
+            Assert.Contains("disco não identificado", Hypotheses.BadSectorWhere(bad, null));
+        }
     }
 }

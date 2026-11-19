@@ -59,7 +59,7 @@ namespace DiagBIG.Core
             bool dismFailed = repair.Any(o => o.SummaryKey != null && o.SummaryKey.StartsWith(RepairLogAnalyzer.DismKey, StringComparison.Ordinal));
 
             // DISM "origem não encontrada" (0x800f081f e parentes) é falta de ISO/internet, não prova de disco.
-            bool repairNotSource = repairFailed && !RepairLogAnalyzer.OnlySourceMissing(repair);
+            bool repairNotSource = repairFailed && !RepairLogAnalyzer.OnlyNonDisk(repair);
             string recentCause = RecentInstall.Cause(d, dbDamaged);
             bool recentDamaged = recentCause != null;
             int? dbAge = RecentInstall.DbAgeDays(d);
@@ -107,7 +107,7 @@ namespace DiagBIG.Core
                 bool tabOnly = tI != null && tI.Verdict == DiagVerdict.Provavel &&
                                (sI == null || sI.Verdict != DiagVerdict.Provavel) && (mI == null || mI.Verdict != DiagVerdict.Provavel);
                 var why = new List<string>();
-                if (badSectors > 0) why.Add("setor defeituoso no disco (" + Hypotheses.BadSectorWhere(recentBad) + ")");
+                if (badSectors > 0) why.Add("setor defeituoso no disco (" + Hypotheses.BadSectorWhere(recentBad, d.SingleDiskModel) + ")");
                 if (ntfs > 0) why.Add("NTFS corrompido");
                 if (smartBad) why.Add("SMART em atenção");
                 if (retries >= Config.DiskRetryThreshold) why.Add("disco com E/S repetida");

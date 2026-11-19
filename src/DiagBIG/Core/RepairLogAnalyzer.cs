@@ -34,11 +34,11 @@ namespace DiagBIG.Core
         /// <summary>Códigos que mandam procurar o disco (CRC, E/S, arquivo corrompido e ilegível).</summary>
         static readonly string[] DiskCodes = { "0x80070017", "0x8007045d", "0x80070570", "0x80070571", "0x8007001f" };
 
-        /// <summary>Códigos do DISM que só dizem "faltou a origem do reparo" (sem internet/ISO): não indicam defeito de disco.</summary>
-        static readonly string[] SourceMissingCodes = { "0x800f081f", "0x800f0915", "0x800f0906", "0x800f0907", "0x800f0950" };
+        /// <summary>Códigos do DISM que não indicam defeito de disco: faltou a origem do reparo (sem internet/ISO) ou parâmetro incorreto (comando mal digitado).</summary>
+        static readonly string[] SourceMissingCodes = { "0x800f081f", "0x800f0915", "0x800f0906", "0x800f0907", "0x800f0950", "0x80070057" };
 
-        /// <summary>true se TODAS as falhas de reparo são DISM de origem não encontrada (não é prova de disco).</summary>
-        public static bool OnlySourceMissing(IEnumerable<Occurrence> repair)
+        /// <summary>true se TODAS as falhas de reparo são DISM sem relação com disco (origem não encontrada, parâmetro incorreto).</summary>
+        public static bool OnlyNonDisk(IEnumerable<Occurrence> repair)
         {
             bool any = false;
             foreach (Occurrence o in repair)
@@ -75,6 +75,7 @@ namespace DiagBIG.Core
                 case "0x80070570": return "arquivo ou pasta corrompido e ilegível: DISCO/sistema de arquivos";
                 case "0x80070571": return "o disco está corrompido e ilegível: DISCO";
                 case "0x8007001f": return "dispositivo não funciona: DISCO";
+                case "0x80070057": return "parâmetro incorreto (comando digitado errado ou opção inválida; rodar de novo como administrador e conferir a sintaxe); não indica disco";
                 case "0x80070002": return "arquivo não encontrado";
                 case "0x80070005": return "acesso negado (rodar como administrador)";
                 case "0x800f0922": return "falha ao aplicar a atualização (pouco espaço ou componente quebrado)";

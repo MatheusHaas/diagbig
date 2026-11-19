@@ -112,6 +112,8 @@ namespace DiagBIG.Core
         public DateTime? DbDataCreated { get; set; }
         /// <summary>Data de instalação do Windows (null = não lida).</summary>
         public DateTime? OsInstalled { get; set; }
+        /// <summary>Modelo do disco quando o PC tem um único disco físico (não USB); null se há mais de um.</summary>
+        public string SingleDiskModel { get; set; }
         public List<LogCoverage> LogCoverages { get; } = new List<LogCoverage>();
         public List<Occurrence> LogClearedEvents { get; } = new List<Occurrence>();
         /// <summary>null = verificado. Preenchido = não deu pra verificar o ID 104.</summary>
