@@ -145,6 +145,34 @@ N) ROTEIRO RAPIDO COM O SIMULADOR (1.6.7) - pasta simulador\, SIMULAR.bat como A
    Janela: opcao G abre o DiagBIG com janela: botao "Testar memoria (mdsched)" (responder Nao, ou Sim e fechar o mdsched) e
      "Verificar disco". Obs.: bad block e Ntfs 55 antigos (fora do periodo) nao tem como simular: Write-EventLog grava com a data de agora.
 
+N) Correções depois da 1.6.7 (exe teste3) - conferir na VM
+   - Qual disco: Write-EventLog -LogName System -Source disk -EventId 153 -EntryType Warning -Message "A operação de ES no endereço de bloco
+     lógico 0xde94440 para o Disco 0 (nome PDO: \Device\00000041) foi repetida."  Esperado no bloco EVENTOS DE DISCO/NTFS:
+     "Unidade: DISCO FÍSICO 0 = <modelo>, <tamanho>, <interface>; unidades: C:, ..." na mensagem do evento e, nas informações do bloco,
+     "DISCO COM ERRO: Disco 0 = ... (N evento(s) citam este disco)". Repetir citando "Disco 5" (não existe na VM): "modelo não identificado",
+     sem quebrar a coleta. Se a VM tiver mais de um disco, conferir que o número bate com o Gerenciamento de Disco.
+   - Volume pequeno: criar um VHD de 50 MB com letra (Gerenciamento de Disco > Ação > Criar VHD, formatar NTFS). Em UNIDADES ele aparece
+     com "(volume pequeno, não conta como pouco espaço)" e NÃO aparece mais "<<< POUCO ESPAÇO", nem o PROVÁVEL "disco cheio/pouco espaço"
+     em ESPAÇO, E/S E ACESSO, nem a causa "Pouco espaço em disco". Um volume grande quase cheio (menos de 10% ou 5 GB livres) na
+     unidade do banco ou na C: continua avisando, agora dizendo qual unidade.
+   - DISM sem origem: rodar "DISM /Online /Cleanup-Image /RestoreHealth" sem internet (0x800f0915/0x800f081f) e somar 3 vezes o
+     disk 153 (Write-EventLog acima). Esperado: O QUE FAZER = "sem defeito grave de disco" (antes virava "TROCAR O DISCO") e a causa
+     de DISM mandando usar /Source com ISO. Com código de disco (ex.: 0x80070570) + evento de disco continua "TROCAR O DISCO".
+     Obs.: isto substitui a frase da 1.6.2 sobre DISM + evento de disco.
+   - Banco recém-instalado: MariaDB instalado na VM HOJE (ou menos de 7 dias), simulador opção 3 (tabela) ou 4 (banco não sobe) e o
+     disk 153/disk 7 acima. Esperado: no bloco do banco "Banco criado em .: <data> (ibdata1/datadir) | Windows instalado em <data>";
+     em CAUSAS PROVÁVEIS "BANCO NOVO JÁ CORROMPENDO ... DISCO, RAM ou controladora/cabo"; em HARDWARE a linha "banco instalado hoje e já
+     corrompendo (datadir novo: não é o dump antigo)"; e O QUE FAZER = "DISCO COM DEFEITO GRAVE (banco instalado hoje já corrompendo,
+     junto com N evento(s) de disco)". Sem nenhum evento de disco, essa frase de veredito não aparece (só a causa).
+     Contraprova: banco com mais de 7 dias (ibdata1 antigo) não mostra "BANCO NOVO JÁ CORROMPENDO".
+   - Contagens: com my.ini de risco e quedas (simulador 10 e 3), o número de desligamentos em "Neste PC o relatório já mostra" e nas
+     causas é o mesmo da linha DESLIGAMENTOS INESPERADOS do RESUMO (incidentes, não 6008 + Kernel-Power 41 somados).
+     O passo final de my.ini do O QUE FAZER termina com "Situação hoje: innodb_doublewrite está OFF; innodb_flush_log_at_trx_commit
+     está 2", sem o texto do aviso repetido dentro de parênteses.
+   - Corrupção no .err: "linha(s) apontando para o tablespace de sistema" bate com o agrupamento do .err (20x = 20), sem somar os eventos
+     MariaDB 100 do Windows que repetem as mesmas linhas.
+   - chkdsk no O QUE FAZER cita só as unidades que existem ("chkdsk /scan em C: e D:"), não manda mais conferir D: que não existe.
+
 N) Novidades da 1.6.6 (conferir na VM)
    - my.ini com innodb_doublewrite=OFF e innodb_flush_log_at_trx_commit=2 + um .err com "marked as crashed": no topo, PARA O N1,
      aparece "ATENÇÃO MY.INI: estas variáveis DEVEM ficar protegidas ... REINICIAR o serviço do MariaDB". Tirar as linhas e o aviso some.
@@ -184,7 +212,7 @@ N) Novidades da 1.6.2 (conferir na VM)
      senão chkdsk /scan, DISM, SFC, reinstalar. Simular: Write-EventLog -Source disk -EventId 7 -EntryType Error -Message "bloco inválido".
    - Bloco "REPARO DO WINDOWS (DISM/SFC JÁ EXECUTADOS)" em DISCO / NTFS e linha no RESUMO. Rodar "DISM /Online /Cleanup-Image /RestoreHealth"
      sem internet (dá 0x800f0915/0x800f081f) e coletar: deve listar "DISM falhou 0x800f0915 — conteúdo de reparo não encontrado".
-     Com evento de disco junto, O QUE FAZER vira TROCAR O DISCO; sem evento de disco manda tentar DISM com /Source de ISO.
+     Com código de disco (CRC/E-S) junto de evento de disco, O QUE FAZER vira TROCAR O DISCO; só "origem não encontrada" manda tentar DISM com /Source de ISO (mudou depois da 1.6.7).
    - Botão "Verificar disco (chkdsk /scan)": roda em cada disco fixo (só leitura), mostra a saída, resultado no fim e grava
      DiagBIG_chkdsk_<PC>_<data>.txt ao lado do relatório. Se o relatório já diz DISCO COM DEFEITO GRAVE, pede confirmação antes.
 
