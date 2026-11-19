@@ -18,7 +18,7 @@ if not exist "%DIAG%" set DIAG=%~dp0DiagBIG.exe
 
 :menu
 echo.
-echo ===== SIMULADOR DiagBIG 1.6.7 (teste5) =====
+echo ===== SIMULADOR DiagBIG 1.6.8 =====
 echo  Eventos do Windows:
 echo   1 - Disco: bad block (disk 7, com ID Harddisk0\DR0)   -^> TROCAR DISCO
 echo   2 - NTFS 55 com "volume ??" (sem unidade)               -^> Unidade NAO INFORMADA
@@ -35,7 +35,7 @@ echo  my.ini e relogio (1.6.6):
 echo  10 - my.ini com innodb_doublewrite=OFF e flush=2 (reinicia o servico)
 echo  11 - RESTAURAR o my.ini original
 echo  12 - Relogio: volta a data 3 dias e corrige (evento Kernel-General 1)
-echo  Correcoes pos-1.6.7 (teste5):
+echo  Correcoes da 1.6.8:
 echo  14 - disk 153 citando "Disco 0" (3x)                   -^> DISCO COM ERRO: Disco 0 = modelo, unidades
 echo  15 - DISM com opcao errada (0x80070057)                 -^> "nao indica disco"
 echo  16 - Criar volume NTFS de 50 MB (VHD)                   -^> "volume pequeno", sem POUCO ESPACO

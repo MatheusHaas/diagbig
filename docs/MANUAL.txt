@@ -140,8 +140,22 @@ ONDE ESTÁ O PROBLEMA
 REPARO DO WINDOWS (DISM/SFC JÁ EXECUTADOS)
   Na seção DISCO / NTFS. Lê o dism.log e o CBS.log e lista as falhas de quem já
   rodou DISM /RestoreHealth ou sfc /scannow (ex.: 0x800f0915, "SFC não reparou").
-  Falha de reparo junto com evento de disco = trocar o disco. Sem evento de disco:
-  tentar DISM com /Source de um ISO da mesma versão e, se falhar, reinstalar.
+  Falha de reparo com código de disco (CRC, erro de E/S) ou junto com evento de disco
+  = trocar o disco. DISM que só diz "origem não encontrada" (0x800f081f, 0x800f0915...)
+  ou "parâmetro incorreto" (0x80070057, comando digitado errado) NÃO prova defeito de
+  disco: tentar DISM com /Source de um ISO da mesma versão e, se falhar, reinstalar.
+
+QUAL DISCO ESTÁ COM ERRO
+  Nos eventos de disco, o relatório mostra "DISCO COM ERRO: Disco N = modelo, tamanho,
+  unidades" (ex.: Disco 0 = KINGSTON, C:). Com um único disco físico, diz que o evento
+  é dele. Volume pequeno (menos de 1 GB: recuperação, EFI) não conta como pouco espaço;
+  só a unidade do banco e a C: geram o aviso POUCO ESPAÇO.
+
+BANCO RECÉM-INSTALADO JÁ CORROMPENDO
+  Na seção do banco, "Banco criado em" mostra a data do ibdata1 e da instalação do
+  Windows. Se o banco tem menos de 7 dias e já corrompe ou cai, a causa "BANCO NOVO JÁ
+  CORROMPENDO" diz que o dump antigo deixou de ser o suspeito: suspeitar de disco, RAM
+  ou controladora/cabo. Junto com evento de disco, o veredito passa a trocar o disco.
 
 BOTÃO VERIFICAR DISCO (chkdsk /scan)
   Roda chkdsk /scan em cada disco fixo (só leitura, não corrige nada), mostra o
