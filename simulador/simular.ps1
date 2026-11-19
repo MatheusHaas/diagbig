@@ -135,8 +135,10 @@ function Vhd-Criar {
             "create partition primary", "format fs=ntfs quick label=DIAGBIG50", "assign letter=$letra")
     $tmp = Join-Path $env:TEMP "diagbig-dp.txt"
     Set-Content -Path $tmp -Value $dp -Encoding ASCII
-    & diskpart.exe /s $tmp | Out-Null
-    Write-Host "Volume de 50 MB criado em ${letra}: (arquivo $VhdArq)"
+    & diskpart.exe /s $tmp | ForEach-Object { if ($_ -match '\S') { Write-Host ("  diskpart: " + $_) } }
+    Start-Sleep -Seconds 2
+    if (Test-Path ($letra + ":\")) { Write-Host "Volume de 50 MB criado em ${letra}: (arquivo $VhdArq)" }
+    else { Write-Host "ATENCAO: o VHD foi criado mas a letra ${letra}: NAO apareceu (veja as linhas do diskpart acima)." -ForegroundColor Red }
 }
 function Vhd-Remover {
     if (-not (Test-Path $VhdArq)) { Write-Host "Nada para remover."; return }

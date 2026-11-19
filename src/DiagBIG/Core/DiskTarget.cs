@@ -89,6 +89,24 @@ namespace DiagBIG.Core
             return lines;
         }
 
+        static readonly Regex PartDiskRx = new Regex(@"Disk\s*#(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        static readonly Regex LogicalRx = new Regex(@"DeviceID\s*=\s*""([A-Za-z]:)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        /// <summary>
+        /// Linha de Win32_LogicalDiskToPartition: Antecedent = ...Win32_DiskPartition.DeviceID="Disk #0, Partition #1",
+        /// Dependent = ...Win32_LogicalDisk.DeviceID="C:". Devolve o número do disco e a letra.
+        /// </summary>
+        public static bool ParsePartitionLink(string antecedent, string dependent, out int diskIndex, out string letter)
+        {
+            diskIndex = -1; letter = null;
+            Match a = PartDiskRx.Match(antecedent ?? "");
+            Match b = LogicalRx.Match(dependent ?? "");
+            if (!a.Success || !b.Success) return false;
+            diskIndex = int.Parse(a.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            letter = b.Groups[1].Value.ToUpperInvariant();
+            return true;
+        }
+
         static readonly Regex DiskIdRx = new Regex(@"\\Device\\Harddisk\d+\\DR\d+", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>ID do disco que o evento cita (ex.: \Device\Harddisk0\DR0); null se não cita.</summary>

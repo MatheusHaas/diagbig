@@ -125,5 +125,17 @@ namespace DiagBIG.Tests
             Assert.Contains("o PC tem só um: VBOX HARDDISK", Hypotheses.BadSectorWhere(bad, "VBOX HARDDISK"));
             Assert.Contains("disco não identificado", Hypotheses.BadSectorWhere(bad, null));
         }
+
+        [Fact]
+        public void LigacaoParticaoUnidade_DaIndiceDoDiscoELetra()
+        {
+            int di; string letter;
+            Assert.True(DiskTarget.ParsePartitionLink(
+                "\\\\BIG-SOFT\\root\\cimv2:Win32_DiskPartition.DeviceID=\"Disk #1, Partition #2\"",
+                "\\\\BIG-SOFT\\root\\cimv2:Win32_LogicalDisk.DeviceID=\"d:\"", out di, out letter));
+            Assert.Equal(1, di);
+            Assert.Equal("D:", letter);
+            Assert.False(DiskTarget.ParsePartitionLink("lixo", "lixo", out di, out letter));
+        }
     }
 }

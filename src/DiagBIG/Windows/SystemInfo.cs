@@ -195,33 +195,37 @@ namespace DiagBIG.Windows
         /// <summary>Número do disco físico (Disco 0, 1...) → "MODELO, 953,9 GB, IDE; unidades C:, D:".</summary>
         public static Dictionary<int, string> DiskMap()
         {
+            // Disco -> letras: lê as ligações partição/unidade direto (sem ASSOCIATORS, que exige escapar o DeviceID).
+            var letters = new Dictionary<int, List<string>>();
+            try
+            {
+                using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Antecedent, Dependent FROM Win32_LogicalDiskToPartition", Options()))
+                    foreach (ManagementObject mo in s.Get())
+                        using (mo)
+                        {
+                            int di; string letter;
+                            if (!DiskTarget.ParsePartitionLink(Convert.ToString(mo["Antecedent"], CultureInfo.InvariantCulture),
+                                                               Convert.ToString(mo["Dependent"], CultureInfo.InvariantCulture), out di, out letter)) continue;
+                            List<string> l;
+                            if (!letters.TryGetValue(di, out l)) { l = new List<string>(); letters[di] = l; }
+                            if (!l.Contains(letter)) l.Add(letter);
+                        }
+            }
+            catch (Exception) { }
+
             var map = new Dictionary<int, string>();
-            using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Index, DeviceID, Model, Size, InterfaceType FROM Win32_DiskDrive", Options()))
+            using (var s = new ManagementObjectSearcher(@"root\cimv2", "SELECT Index, Model, Size, InterfaceType FROM Win32_DiskDrive", Options()))
                 foreach (ManagementObject disk in s.Get())
                     using (disk)
                     {
                         int idx = Convert.ToInt32(disk["Index"], CultureInfo.InvariantCulture);
-                        string dev = Convert.ToString(disk["DeviceID"], CultureInfo.InvariantCulture) ?? "";
                         object size = disk["Size"];
-                        var letters = new List<string>();
-                        try
-                        {
-                            string q1 = "ASSOCIATORS OF {Win32_DiskDrive.DeviceID='" + dev.Replace("\\", "\\\\") + "'} WHERE AssocClass=Win32_DiskDriveToDiskPartition";
-                            using (var parts = new ManagementObjectSearcher(@"root\cimv2", q1, Options()))
-                                foreach (ManagementObject part in parts.Get())
-                                    using (part)
-                                    {
-                                        string q2 = "ASSOCIATORS OF {Win32_DiskPartition.DeviceID='" + Convert.ToString(part["DeviceID"], CultureInfo.InvariantCulture) + "'} WHERE AssocClass=Win32_LogicalDiskToPartition";
-                                        using (var lds = new ManagementObjectSearcher(@"root\cimv2", q2, Options()))
-                                            foreach (ManagementObject ld in lds.Get())
-                                                using (ld) letters.Add(Convert.ToString(ld["DeviceID"], CultureInfo.InvariantCulture));
-                                    }
-                        }
-                        catch (Exception) { }
+                        List<string> l;
+                        letters.TryGetValue(idx, out l);
                         map[idx] = (Convert.ToString(disk["Model"], CultureInfo.InvariantCulture) ?? "").Trim() +
                                    (size != null ? ", " + ReportBuilder.FormatBytes(Convert.ToInt64(size, CultureInfo.InvariantCulture)) : "") +
                                    ", " + Convert.ToString(disk["InterfaceType"], CultureInfo.InvariantCulture) +
-                                   "; unidades: " + (letters.Count > 0 ? string.Join(", ", letters.ToArray()) : "nenhuma com letra");
+                                   "; unidades: " + (l != null && l.Count > 0 ? string.Join(", ", l.ToArray()) : "nenhuma com letra");
                     }
             return map;
         }
