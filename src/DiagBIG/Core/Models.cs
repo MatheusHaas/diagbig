@@ -141,6 +141,9 @@ namespace DiagBIG.Core
         public bool? DbServiceRunning { get; set; }
         /// <summary>Serviços de banco com inicialização DESATIVADA (podem ser restos de uma troca de servidor/banco).</summary>
         public List<string> DisabledDbServices { get; } = new List<string>();
+        /// <summary>Resultado do winmgmt /verifyrepository (só leitura).</summary>
+        public WmiRepoState WmiRepo { get; set; }
+        public string WmiRepoNote { get; set; }
         public List<ReportSection> Sections { get; } = new List<ReportSection>();
     }
 }

@@ -275,6 +275,19 @@ bloco curto do caso. Os 8 casos:
      segundos (estável, não sobe ou cai em loop), lista as tabelas do .err novo
      e depois tira o force mantendo a 3307; "Restaurar my.ini original" desfaz.
      OPTIMIZE/ALTER e os três programas continuam com o N2.
+
+REPOSITÓRIO DO WMI (erros aleatórios do Windows, ex.: dclvendas.exe no bigupdate)
+-------------------------------------------------------------------------------
+O DiagBIG verifica o repositório do WMI na coleta (winmgmt /verifyrepository, só
+leitura). Se estiver inconsistente, a tela do N1 mostra "ATENÇÃO WMI" e o
+RESUMO traz a linha REPOSITÓRIO WMI; isso não muda quem acionar.
+O botão "Reparar WMI (repositório)" faz o procedimento manual, sem reiniciar o
+Windows: para o WMI (net stop winmgmt /y), renomeia wbem\Repository para
+OLD_Repository_AAAAMMDD_HHMM, winmgmt /resetRepository, confere e religa os
+serviços que dependiam do WMI. A pasta antiga fica no disco. Usar fora do
+movimento, em balcões, caixas e terminais (servidor só combinando); programas
+de terceiros podem perder registros WMI próprios. Depois, rodar de novo
+bigupdate, acertaestrutura e acertasequenciador.
   3. Disco com defeito .......... EQUIPE TÉCNICA: trocar disco/servidor. Mostra
      o disco com erro e os reinícios/desligamentos.
   4. Banco danificado além de tabelas, sem disco ruim ... EQUIPE TÉCNICA:

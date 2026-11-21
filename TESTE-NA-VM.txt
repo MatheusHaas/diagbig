@@ -193,6 +193,23 @@ N) 1.7.0 - BOTAO "Manutencao do banco (force 3307)" (caso 2, so tabelas) - na VM
    4) Botao "Restaurar my.ini original": volta o my.ini guardado (porta 3306 de novo), reinicia e confirma estavel. Conferir que o sistema/base abre.
    5) O botao NAO roda OPTIMIZE/ALTER nem bigupdate/acertaestrutura/acertasequenciador: isso continua manual (N2). Tela essencial do caso 2 mostra o roteiro de 8 passos.
 
+N) 1.7.0 - BOTAO "Reparar WMI (repositorio)" e linha REPOSITORIO WMI - simulador\SIMULAR.bat como administrador
+   Procedimento do botao = o manual do N1/N2: net stop winmgmt /y, renomear wbem\Repository para OLD_Repository_AAAAMMDD_HHMM, winmgmt /resetRepository,
+   conferir e religar os servicos que dependiam do WMI. Nao reinicia o Windows. A pasta antiga NAO e apagada.
+   1) Opcao 30 (estado): winmgmt /verifyrepository deve dizer "consistente" e so existir a pasta Repository.
+   2) Coletar (C ou G): no RESUMO a linha "REPOSITORIO WMI ... repositorio consistente" e NADA de "ATENCAO WMI" na tela essencial.
+   3) Opcao 28: para o WMI, guarda Repository.diagbig-bak, estraga 4 KB de INDEX.BTR e sobe o WMI. NAO use outras opcoes do simulador ate a 29
+      (o simulador evita WMI, mas o resto da VM pode se comportar mal). Opcao 30 de novo: pode dizer INCONSISTENTE (se disser consistente, anote: o fluxo
+      do botao e testado igual, ele avisa e segue).
+   4) Coletar (G): se inconsistente, a tela essencial mostra "ATENCAO WMI: ... Reparar WMI (repositorio) ... nao precisa reiniciar" e o RESUMO a linha
+      "REPOSITORIO WMI ... INCONSISTENTE". O QUEM ACIONAR nao muda. Se a coleta demorar por causa do WMI quebrado, anote quanto.
+   5) Botao "Reparar WMI (repositorio)": aviso (fora do movimento, terceiros podem perder registros, nao use em servidor sem combinar); Sim. Esperado nas etapas:
+      verificar antes; dependentes listados; parar; renomear (mostra MB); resetRepository; religar winmgmt e dependentes; verificar depois;
+      "REPOSITORIO RECRIADO E CONSISTENTE. Pasta antiga: ...\OLD_Repository_AAAAMMDD_HHMM".
+   6) Opcao 30: pasta OLD_Repository_* existe, Repository novo consistente. Rodar de novo o botao quando ja consistente: ele avisa "ja esta consistente. Seguindo mesmo assim".
+   7) Opcao 29: restaura a copia original, apaga OLD_Repository_* e religa o WMI. Opcao 30: so a pasta Repository.
+   Se a opcao 28 deixar o WMI sem subir: opcao 29 resolve (usa a copia); sem copia, ela roda winmgmt /resetRepository.
+
 N) TESTE COMPLETO DE UMA VEZ (1.6.8) - simulador\SIMULAR.bat como ADMINISTRADOR, opcao T
    A opcao T roda os cenarios 14, 15, 16, 18, 6, 10 e 12 em sequencia, coleta sem janela, mostra o resultado e restaura tudo
    (11, 9, 19 e 17). Leva alguns minutos (o banco e parado e iniciado varias vezes). Depois copie o TXT mais recente de

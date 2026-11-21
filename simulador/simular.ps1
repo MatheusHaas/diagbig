@@ -245,6 +245,74 @@ function Botao-Limpar {
     Write-Host "Limpeza do teste do botao concluida." -ForegroundColor Green
 }
 
+# ---- Botao "Reparar WMI (repositorio)" do DiagBIG 1.7.0 ----
+# Nao usa WMI (Get-WmiObject) aqui: com o repositorio quebrado ele falharia. Usa sc/net/Get-Service.
+$WbemDir = Join-Path $env:windir "System32\wbem"
+$WmiBak  = Join-Path $WbemDir "Repository.diagbig-bak"
+$WmiDeps = Join-Path $env:TEMP "diagbig-wmi-deps.txt"
+
+function Wmi-Dependentes($nome, $lista) {
+    foreach ($d in @((Get-Service -Name $nome).DependentServices)) {
+        if ($d.Status -eq 'Running' -and ($lista -notcontains $d.Name)) { $lista += $d.Name; $lista = Wmi-Dependentes $d.Name $lista }
+    }
+    return $lista
+}
+function Wmi-Parar { & net.exe stop winmgmt /y 2>&1 | ForEach-Object { if ($_ -match '\S') { Write-Host ("  net: " + $_) } } }
+function Wmi-Subir {
+    Start-Service -Name winmgmt -ErrorAction SilentlyContinue
+    if (Test-Path $WmiDeps) { foreach ($n in @(Get-Content $WmiDeps)) { if ($n) { Start-Service -Name $n -ErrorAction SilentlyContinue } } }
+    Write-Host ("winmgmt: " + (Get-Service -Name winmgmt).Status)
+}
+
+# 28: guarda uma copia do repositorio e estraga um pedaco dele (WMI pode ficar inconsistente). Depois NAO use outras opcoes ate rodar a 29.
+function Wmi-Corromper {
+    $repo = Join-Path $WbemDir "Repository"
+    if (-not (Test-Path $repo)) { Write-Host "Repositorio nao encontrado: $repo" -ForegroundColor Red; return }
+    $lista = @(Wmi-Dependentes "winmgmt" @())
+    Set-Content -Path $WmiDeps -Value $lista -Encoding ASCII
+    Write-Host ("Dependentes rodando (religados na 29): " + ($lista -join ", "))
+    Wmi-Parar
+    if (-not (Test-Path $WmiBak)) { Copy-Item -Path $repo -Destination $WmiBak -Recurse -Force; Write-Host "Copia do repositorio: $WmiBak" }
+    $alvo = Join-Path $repo "INDEX.BTR"
+    if (-not (Test-Path $alvo)) { $alvo = (Get-ChildItem -Path $repo -File | Sort-Object Length -Descending | Select-Object -First 1).FullName }
+    $fs = [System.IO.File]::Open($alvo, 'Open', 'ReadWrite', 'None')
+    try { $fs.Position = [Math]::Min(8192, [Math]::Max(0, $fs.Length - 4096)); $b = New-Object byte[] 4096; for ($i = 0; $i -lt $b.Length; $i++) { $b[$i] = 255 }; $fs.Write($b, 0, $b.Length) } finally { $fs.Close() }
+    Write-Host "Arquivo estragado: $alvo (4 KB com 0xFF)"
+    Wmi-Subir
+    Write-Host "Agora: DiagBIG.exe (opcao G ou C). Se o verifyrepository ainda disser consistente, o botao pergunta e segue igual. Depois, opcao 29 para limpar." -ForegroundColor Yellow
+}
+
+# 30: mostra verifyrepository, as pastas Repository*/OLD_Repository* do wbem e o servico.
+function Wmi-Estado {
+    Write-Host "== winmgmt /verifyrepository =="
+    & winmgmt.exe /verifyrepository 2>&1 | ForEach-Object { Write-Host ("  " + $_) }
+    Write-Host "== pastas em $WbemDir =="
+    foreach ($d in @(Get-ChildItem -Path $WbemDir -Directory -Filter "*Repository*")) {
+        $mb = [Math]::Round(((Get-ChildItem -Path $d.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum) / 1MB, 1)
+        Write-Host ("  " + $d.Name + "  (" + $mb + " MB)")
+    }
+    Write-Host ("winmgmt: " + (Get-Service -Name winmgmt).Status)
+}
+
+# 29: desfaz o teste do botao: volta a copia do repositorio (ou faz resetRepository), apaga OLD_Repository_* criadas pelo botao e religa o WMI.
+function Wmi-Limpar {
+    $repo = Join-Path $WbemDir "Repository"
+    Wmi-Parar
+    if (Test-Path $WmiBak) {
+        if (Test-Path $repo) { Remove-Item -Path $repo -Recurse -Force -ErrorAction SilentlyContinue }
+        if (Test-Path $repo) { Write-Host "ATENCAO: nao consegui remover $repo (em uso?)." -ForegroundColor Red; Wmi-Subir; return }
+        Rename-Item -Path $WmiBak -NewName "Repository"
+        Write-Host "Repositorio original restaurado da copia."
+    } else {
+        Write-Host "Sem copia do simulador: rodando winmgmt /resetRepository."
+        & winmgmt.exe /resetRepository 2>&1 | ForEach-Object { Write-Host ("  " + $_) }
+    }
+    foreach ($d in @(Get-ChildItem -Path $WbemDir -Directory -Filter "OLD_Repository_*")) { Remove-Item -Path $d.FullName -Recurse -Force -ErrorAction SilentlyContinue; Write-Host ("Apagada: " + $d.Name) }
+    Wmi-Subir
+    if (Test-Path $WmiDeps) { Remove-Item $WmiDeps -ErrorAction SilentlyContinue }
+    Write-Host "Limpeza do teste do WMI concluida." -ForegroundColor Green
+}
+
 switch ($Cenario) {
  1 { Evento "disk" 7 "O dispositivo \Device\Harddisk0\DR0 tem um bloco invalido (bad block)." }
  2 { Evento "Ntfs" 55 "Corrupcao detectada na estrutura do sistema de arquivos, no volume ??." }
@@ -292,5 +360,8 @@ switch ($Cenario) {
  25 { Botao-Preparar }
  26 { Botao-Limpar }
  27 { Botao-Estado }
+ 28 { Wmi-Corromper }
+ 29 { Wmi-Limpar }
+ 30 { Wmi-Estado }
  default { Write-Host "Cenario invalido." }
 }

@@ -27,6 +27,7 @@ namespace DiagBIG.UI
         readonly Button chkdsk = new Button();
         readonly Button memtest = new Button();
         readonly Button maint = new Button();
+        readonly Button wmi = new Button();
         readonly Label copied = new Label();
         readonly System.Windows.Forms.Timer copiedTimer = new System.Windows.Forms.Timer();
 
@@ -86,7 +87,8 @@ namespace DiagBIG.UI
             Setup(chkdsk, "Verificar disco (chkdsk /scan)", (s, e) => RunChkdsk());
             Setup(memtest, "Testar memória (mdsched)", (s, e) => RunMemTest());
             Setup(maint, "Manutenção do banco (force 3307)", (s, e) => RunMaintenance());
-            bottom.Controls.AddRange(new Control[] { toggle, copyScreen, copySummary, copyAll, openTxt, openFolder, chkdsk, memtest, maint });
+            Setup(wmi, "Reparar WMI (repositório)", (s, e) => RunWmi());
+            bottom.Controls.AddRange(new Control[] { toggle, copyScreen, copySummary, copyAll, openTxt, openFolder, chkdsk, memtest, maint, wmi });
             copied.Text = "Copiado!";
             copied.AutoSize = true;
             copied.ForeColor = Color.DarkGreen;
@@ -143,7 +145,7 @@ namespace DiagBIG.UI
         void SetBusy(bool busy)
         {
             running = busy;
-            collect.Enabled = period.Enabled = chkdsk.Enabled = memtest.Enabled = maint.Enabled = !busy;
+            collect.Enabled = period.Enabled = chkdsk.Enabled = memtest.Enabled = maint.Enabled = wmi.Enabled = !busy;
             copyAll.Enabled = copySummary.Enabled = copyScreen.Enabled = toggle.Enabled = !busy && last != null;
             openTxt.Enabled = openFolder.Enabled = !busy && last != null && last.SavedPath != null;
             UseWaitCursor = busy;
@@ -257,6 +259,12 @@ namespace DiagBIG.UI
                     MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
             using (var f = new MaintenanceForm(Icon)) f.ShowDialog(this);
+        }
+
+        void RunWmi()
+        {
+            if (running) return;
+            using (var f = new WmiRepairForm(Icon)) f.ShowDialog(this);
         }
 
         void RunMemTest()

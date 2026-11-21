@@ -49,6 +49,11 @@ namespace DiagBIG.Core
         {
             var plan = BuildCore(d, n1);
             if (n1 != null && d.DisabledDbServices.Count > 0) n1.Add("ATENÇÃO " + DisabledServiceText(d.DisabledDbServices));
+            if (d.WmiRepo == WmiRepoState.Inconsistente)
+            {
+                if (n1 != null) n1.Add(WmiRepo.N1Line());
+                if (plan.Count > 0) plan.Add(plan.Count + ". WMI: o repositório do WMI está inconsistente. Depois do reparo do Windows (ou antes, se o erro for no bigupdate/dclvendas.exe), usar o botão \"Reparar WMI (repositório)\" fora do movimento; não precisa reiniciar. Depois rodar de novo bigupdate, acertaestrutura e acertasequenciador.");
+            }
             return plan;
         }
 

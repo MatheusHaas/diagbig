@@ -291,6 +291,18 @@ namespace DiagBIG.Windows
             d.Summary.Add(ReportBuilder.Summarize("EVENTOS DO BANCO NO WINDOWS", new[] { app, scm }));
             d.Sections.Add(evSection);
 
+            progress("Verificando o repositório do WMI...");
+            {
+                string wraw;
+                d.WmiRepo = WmiRepository.Verify(out wraw);
+                d.WmiRepoNote = d.WmiRepo == WmiRepoState.NaoVerificado ? (wraw ?? "").Trim().Replace("\r", " ").Replace("\n", " ") : null;
+                d.Summary.Add(new SummaryItem
+                {
+                    Label = "REPOSITÓRIO WMI",
+                    Status = d.WmiRepo == WmiRepoState.Consistente ? CheckStatus.Ok : d.WmiRepo == WmiRepoState.Inconsistente ? CheckStatus.Atencao : CheckStatus.NaoVerificado,
+                    Text = WmiRepo.SummaryText(d.WmiRepo, d.WmiRepoNote),
+                });
+            }
             progress("Montando relatório...");
             d.DisabledDbServices.AddRange(services.Where(x => x.StartType == "DESATIVADO").Select(x => x.Name));
             d.DbServiceRunning = services.Count == 0 ? (bool?)null : services.Any(s => s.Status == "rodando");

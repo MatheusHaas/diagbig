@@ -52,6 +52,10 @@ echo  Botao Manutencao do banco (1.7.0):
 echo  25 - PREPARAR: LIMPA os logs Sistema/Aplicativo (tira os erros de disco), tabela quebrada no .err + my.ini com doublewrite=OFF/flush=2
 echo  27 - MOSTRAR o estado: my.ini (port, force, doublewrite, flush), backups e servico
 echo  26 - LIMPAR TUDO do teste do botao (my.ini, .err, servico rodando)
+echo  Botao Reparar WMI (1.7.0):
+echo  28 - ESTRAGAR o repositorio do WMI (guarda copia; nao use outras opcoes ate a 29)
+echo  30 - MOSTRAR: verifyrepository, pastas Repository/OLD_Repository e servico
+echo  29 - LIMPAR o teste do WMI (restaura a copia, apaga OLD_Repository_*, religa o WMI)
 echo   N - OS 8 CASOS DO N1 EM SEQUENCIA (limpa os logs, usa --dias 7, confere QUEM ACIONAR, restaura)
 echo   T - TODOS DE UMA VEZ: 14, 15, 16, 18, 6, 10, 12, coleta, mostra tudo e restaura (11, 9, 19, 17)
 echo  Coleta e limpeza:
