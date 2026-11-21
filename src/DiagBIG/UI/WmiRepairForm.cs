@@ -69,8 +69,15 @@ namespace DiagBIG.UI
             busy = true; go.Enabled = false; UseWaitCursor = true;
             var th = new Thread(() =>
             {
+                int startAt = all.Length;
                 try { Run(); }
                 catch (Exception ex) { Append("\r\nERRO: " + ex.Message + "\r\n"); }
+                try
+                {
+                    string saved = ProcedureLog.Save("reparar-wmi", SystemInfo.HostName(), all.ToString(startAt, all.Length - startAt));
+                    Append("\r\n" + (saved != null ? "Relatório do procedimento salvo em " + saved : "Não consegui salvar o relatório do procedimento.") + "\r\n");
+                }
+                catch (Exception) { }
                 finally { busy = false; try { BeginInvoke(new Action(() => { go.Enabled = true; UseWaitCursor = false; })); } catch (InvalidOperationException) { } }
             });
             th.IsBackground = true;
@@ -111,7 +118,7 @@ namespace DiagBIG.UI
                 catch (Exception ex) { Append("Não consegui renomear: " + ex.Message + "\r\nNada foi alterado no repositório; religando o WMI.\r\n"); return; }
 
                 Append("== 4) parando de novo, se o WMI religou, e winmgmt /resetRepository ==\r\n");
-                StopWmi();
+                if (IsRunning("winmgmt")) StopWmi(); else Append("  o WMI continua parado.\r\n");
                 string o = WmiRepository.Run("wbem\\winmgmt.exe", "/resetRepository", 300000, out code);
                 Append("  " + o.Trim().Replace("\r\n", "\r\n  ") + "\r\n  (código " + code + ")\r\n\r\n");
             }

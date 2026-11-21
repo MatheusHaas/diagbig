@@ -269,11 +269,8 @@ bloco curto do caso. Os 8 casos:
      OPTIMIZE/ALTER TABLE ... ENGINE=InnoDB só nelas; tirar o force, subir na
      3307 e observar; se operar normal, porta 3306 e rodar bigupdate.exe,
      acertaestrutura.exe e acertasequenciador.exe. Falhou: equipe técnica.
-     O botão "Manutenção do banco (force 3307)" faz os passos do my.ini e da
-     subida: aplica force 1 ou 2, porta 3307, doublewrite ON e flush 1 (guarda
-     o my.ini original e pede confirmação), reinicia o serviço e observa 30
-     segundos (estável, não sobe ou cai em loop), lista as tabelas do .err novo
-     e depois tira o force mantendo a 3307; "Restaurar my.ini original" desfaz.
+     Nesta versão não há botão para o my.ini/force: o N2 faz esses passos à
+     mão (um botão de manutenção do banco fica para uma versão futura).
      OPTIMIZE/ALTER e os três programas continuam com o N2.
 
 REPOSITÓRIO DO WMI (erros aleatórios do Windows, ex.: dclvendas.exe no bigupdate)

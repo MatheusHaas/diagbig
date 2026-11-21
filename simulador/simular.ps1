@@ -48,7 +48,10 @@ function Linhas-Err($linhas) {
     if (-not $f) { Write-Host "NAO ACHEI o .err. Passe o caminho: simular.ps1 -Err <arquivo>" -ForegroundColor Red; return }
     Com-Servico {
         $bak = $f + ".bak-diagbig"
-        if (-not (Test-Path $bak)) { Copy-Item $f $bak; Write-Host "Copia de seguranca: $bak" }
+        # Copia de seguranca = o my.ini como esta AGORA, a menos que ele ja tenha sido alterado por este simulador (marca abaixo).
+        # Assim um my.ini que voce colocar na VM nunca e trocado por uma copia velha.
+        $jaAlterado = (Get-Content -Path $f -Encoding Default | Where-Object { $_ -match 'SIMULADOR-DIAGBIG' }).Count -gt 0
+        if (-not $jaAlterado -or -not (Test-Path $bak)) { Copy-Item $f $bak -Force; Write-Host "Copia de seguranca: $bak" }
         $t = (Get-Date).AddMinutes(-5).ToString("yyyy-MM-dd HH:mm:ss")
         $linhas | ForEach-Object { Add-Content -Path $f -Value ($t + " " + $_) -Encoding Default }
         Write-Host "Linhas gravadas em $f"
@@ -75,19 +78,35 @@ function Ini-Risco {
     if (-not $f) { Write-Host "NAO ACHEI o my.ini." -ForegroundColor Red; return }
     Com-Servico {
         $bak = $f + ".bak-diagbig"
-        if (-not (Test-Path $bak)) { Copy-Item $f $bak; Write-Host "Copia de seguranca: $bak" }
-        $lin = @(Get-Content -Path $f -Encoding Default | Where-Object { $_ -notmatch '^\s*innodb_doublewrite\s*=' -and $_ -notmatch '^\s*innodb_flush_log_at_trx_commit\s*=' })
+        # Copia de seguranca = o my.ini como esta AGORA, a menos que ele ja tenha sido alterado por este simulador (marca abaixo).
+        # Assim um my.ini que voce colocar na VM nunca e trocado por uma copia velha.
+        $jaAlterado = (Get-Content -Path $f -Encoding Default | Where-Object { $_ -match 'SIMULADOR-DIAGBIG' }).Count -gt 0
+        if (-not $jaAlterado -or -not (Test-Path $bak)) { Copy-Item $f $bak -Force; Write-Host "Copia de seguranca: $bak" }
+        # Troca o valor NO MESMO LUGAR se a variavel ja existe (o layout do seu my.ini nao muda); so insere se nao existir.
+        $lin = @(Get-Content -Path $f -Encoding Default | Where-Object { $_ -notmatch 'SIMULADOR-DIAGBIG' })
         $novo = New-Object System.Collections.ArrayList
-        $ok = $false
+        $achouDw = $false; $achouFl = $false
         foreach ($l in $lin) {
+            if ($l -match '^\s*innodb_doublewrite\s*=') { if (-not $achouDw) { [void]$novo.Add("innodb_doublewrite=OFF"); $achouDw = $true }; continue }
+            if ($l -match '^\s*innodb_flush_log_at_trx_commit\s*=') { if (-not $achouFl) { [void]$novo.Add("innodb_flush_log_at_trx_commit=2"); $achouFl = $true }; continue }
             [void]$novo.Add($l)
-            if (-not $ok -and $l -match '^\s*\[mysqld\]\s*$') {
-                [void]$novo.Add("innodb_doublewrite=OFF")
-                [void]$novo.Add("innodb_flush_log_at_trx_commit=2")
-                $ok = $true
+        }
+        $ok = $true
+        if (-not $achouDw -or -not $achouFl) {
+            $ok = $false
+            $tmp = New-Object System.Collections.ArrayList
+            foreach ($l in $novo) {
+                [void]$tmp.Add($l)
+                if (-not $ok -and $l -match '^\s*\[mysqld\]\s*$') {
+                    if (-not $achouDw) { [void]$tmp.Add("innodb_doublewrite=OFF") }
+                    if (-not $achouFl) { [void]$tmp.Add("innodb_flush_log_at_trx_commit=2") }
+                    $ok = $true
+                }
             }
+            $novo = $tmp
         }
         if (-not $ok) { Write-Host "Sem [mysqld] no my.ini: nada alterado." -ForegroundColor Red; return }
+        [void]$novo.Insert(0, "# SIMULADOR-DIAGBIG: valores de doublewrite/flush colocados pelo simulador (opcao 25)")
         Set-Content -Path $f -Value $novo -Encoding Default
         Write-Host "my.ini alterado: $f"
     }
@@ -203,6 +222,8 @@ function Botao-Preparar {
       "9 [ERROR] mysqld: Table '.\loja\movimento' is marked as crashed and should be repaired",
       "9 [ERROR] Got error 145 when reading table '.\loja\estoque'")
     Ini-Risco
+    $fi = Achar-Ini
+    if ($fi -and (Test-Path ($fi + '.diagbig-original'))) { Remove-Item ($fi + '.diagbig-original') -Force; Write-Host 'Removido .diagbig-original velho.' }
     Write-Host "Pronto. Agora: DiagBIG.exe (opcao G) > 'Manutencao do banco (force 3307)' > botao 1; depois a opcao 27 mostra o estado." -ForegroundColor Green
 }
 
@@ -229,7 +250,7 @@ function Botao-Limpar {
     }
     if ($f) {
         foreach ($suf in @(".diagbig-original", ".bak-diagbig")) {
-            if (Test-Path ($f + $suf)) { Copy-Item ($f + $suf) $f -Force; Remove-Item ($f + $suf); Write-Host "Restaurado de $suf" }
+            if (Test-Path ($f + $suf)) { Copy-Item $f ($f + ".antes-da-limpeza") -Force; Copy-Item ($f + $suf) $f -Force; Remove-Item ($f + $suf); Write-Host "Restaurado de $suf" }
         }
         $sobra = @(Get-Content -Path $f -Encoding Default | Where-Object { $_ -match '^\s*innodb_force_recovery\s*=' -or $_ -match '^\s*port\s*=\s*3307' })
         if ($sobra.Count -gt 0) { Write-Host "ATENCAO: o my.ini ainda tem force/porta 3307 (ja estava assim antes do teste?): $($sobra -join ' | ')" -ForegroundColor Yellow }

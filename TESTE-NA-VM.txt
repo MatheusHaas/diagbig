@@ -1,4 +1,5 @@
 ﻿DiagBIG - roteiro de teste na VM Windows
+OBS: nesta versao o botao "Manutencao do banco (force 3307)" NAO esta no menu Ferramentas (fica para depois). Pule os testes dele (opcoes 25/26/27 so servem para ele).
 =========================================
 
 Antes de começar
@@ -149,7 +150,7 @@ N) 1.7.0 - TELA ESSENCIAL POR CASO - simulador\SIMULAR.bat como ADMINISTRADOR, o
    Antes: copiar o DiagBIG.exe (1.7.0) para a pasta DiagBIG da VM (o simulador usa o exe da pasta de cima).
    A opcao N pede SIM e depois, para cada caso: limpa os logs Sistema e Aplicativo, aplica o cenario, coleta (--sem-janela --dias 7),
    mostra o texto da tela inicial, confere "QUEM ACIONAR" e restaura. No fim imprime o RESUMO DOS CASOS (OK/DIVERGENTE) e salva
-   simulador\casos-resultado.txt (copie para o compartilhado). Leva uns 10 a 15 minutos. Os casos:
+   DiagBIG_relatorios\Simulador_casos-resultado.txt (copie para o compartilhado). Leva uns 10 a 15 minutos. Os casos:
      1  nada (logs limpos) ............ QUEM ACIONAR: NINGUEM POR ESTE RELATORIO
      2  cenario 3 (tabela quebrada) ... N2 SISTEMA, "innodb_force_recovery=1 ou 2", porta 3307, "Apos as 20:00: ... EQUIPE TECNICA"
                                      + roteiro do N2: doublewrite=ON, ALTER TABLE, "TIRAR o innodb_force_recovery", bigupdate/acertaestrutura/acertasequenciador
@@ -164,6 +165,16 @@ N) 1.7.0 - TELA ESSENCIAL POR CASO - simulador\SIMULAR.bat como ADMINISTRADOR, o
    Depois abra o DiagBIG.exe com janela (opcao G): ele abre no essencial; "Mostrar relatorio completo" alterna; "Copiar tela" copia o
    que esta visivel; "Copiar resumo" e "Copiar tudo" continuam. A linha IP aparece na IDENTIFICACAO (tela e TXT).
    As opcoes 21 a 24 rodam separadas (24 remove o arquivo que enche o C:).
+
+N) RELATORIO DOS TESTES (para enviar) - 1.7.0
+   Cada acao dos botoes "Manutencao do banco" e "Reparar WMI" grava SOZINHA um TXT em DiagBIG_relatorios: Procedimento_manutencao-banco-aplicar_PC_data.txt,
+   ...-tirar-force, ...-restaurar e Procedimento_reparar-wmi_PC_data.txt, com os comandos/etapas, os resultados e o ESTADO FINAL (linhas do my.ini, servico,
+   fim do .err). Esses arquivos NAO sao apagados pela limpeza dos relatorios antigos. O caminho aparece no fim da janela.
+   TODA a saida dos testes fica numa pasta so: DiagBIG_relatorios (relatorios DiagBIG_*, Procedimento_*, Simulador_log.txt, Simulador_relatorio-teste_*, Simulador_casos-resultado.txt).
+   Basta copiar essa pasta para o compartilhado.
+
+   Simulador: opcao R gera DiagBIG_relatorios\Simulador_relatorio-teste_<data>.txt com o estado do my.ini/servico (27), do WMI (30) e as ultimas 80 linhas do log com os comandos e
+   resultados de cada opcao. Rode a R no fim de cada teste (antes da limpeza 26/29) e copie para a pasta compartilhada junto com os Procedimento_*.txt.
 
 N) 1.7.0 - BOTAO "Manutencao do banco (force 3307)" (caso 2, so tabelas) - na VM, DiagBIG.exe com janela, como administrador
    PELO SIMULADOR (simulador\SIMULAR.bat como administrador):

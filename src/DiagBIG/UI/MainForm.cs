@@ -24,10 +24,12 @@ namespace DiagBIG.UI
         readonly Button copySummary = new Button();
         readonly Button openTxt = new Button();
         readonly Button openFolder = new Button();
-        readonly Button chkdsk = new Button();
-        readonly Button memtest = new Button();
-        readonly Button maint = new Button();
-        readonly Button wmi = new Button();
+        readonly ToolStripMenuItem chkdsk = new ToolStripMenuItem();
+        readonly ToolStripMenuItem memtest = new ToolStripMenuItem();
+        readonly ToolStripMenuItem maint = new ToolStripMenuItem();
+        readonly ToolStripMenuItem wmi = new ToolStripMenuItem();
+        readonly Button tools = new Button();
+        readonly ContextMenuStrip toolsMenu = new ContextMenuStrip();
         readonly Label copied = new Label();
         readonly System.Windows.Forms.Timer copiedTimer = new System.Windows.Forms.Timer();
 
@@ -77,18 +79,24 @@ namespace DiagBIG.UI
             output.HideSelection = false;
 
             // --- rodapé ---
-            var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false, Padding = new Padding(4) };
+            var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Padding = new Padding(4) };
             Setup(toggle, "Mostrar relatório completo", (s, e) => { showFull = !showFull; ShowText(); });
             Setup(copyScreen, "Copiar tela", (s, e) => Copy(output.Text));
             Setup(copySummary, "Copiar resumo", (s, e) => Copy(last == null ? null : last.ResumoText));
             Setup(copyAll, "Copiar tudo", (s, e) => Copy(last == null ? null : last.FullText));
             Setup(openTxt, "Abrir TXT", (s, e) => OpenTxt());
             Setup(openFolder, "Abrir pasta", (s, e) => OpenFolder());
-            Setup(chkdsk, "Verificar disco (chkdsk /scan)", (s, e) => RunChkdsk());
-            Setup(memtest, "Testar memória (mdsched)", (s, e) => RunMemTest());
-            Setup(maint, "Manutenção do banco (force 3307)", (s, e) => RunMaintenance());
-            Setup(wmi, "Reparar WMI (repositório)", (s, e) => RunWmi());
-            bottom.Controls.AddRange(new Control[] { toggle, copyScreen, copySummary, copyAll, openTxt, openFolder, chkdsk, memtest, maint, wmi });
+            chkdsk.Text = "Verificar disco (chkdsk /scan)"; chkdsk.Click += (s, e) => RunChkdsk();
+            memtest.Text = "Testar memória (mdsched)"; memtest.Click += (s, e) => RunMemTest();
+            maint.Text = "Manutenção do banco (force 3307)"; maint.Click += (s, e) => RunMaintenance();
+            wmi.Text = "Reparar WMI (repositório)"; wmi.Click += (s, e) => RunWmi();
+            toolsMenu.Items.AddRange(new ToolStripItem[] { chkdsk, memtest });
+#if FORCE_MAINT
+            toolsMenu.Items.Add(maint); // botão de manutenção do banco (force 3307): fora desta versão; compilar com -p:ForceMaint=1
+#endif
+            toolsMenu.Items.Add(wmi);
+            Setup(tools, "Ferramentas \u25BE", (s, e) => toolsMenu.Show(tools, new Point(0, tools.Height)));
+            bottom.Controls.AddRange(new Control[] { toggle, copyScreen, copySummary, copyAll, openTxt, openFolder, tools });
             copied.Text = "Copiado!";
             copied.AutoSize = true;
             copied.ForeColor = Color.DarkGreen;
@@ -145,7 +153,7 @@ namespace DiagBIG.UI
         void SetBusy(bool busy)
         {
             running = busy;
-            collect.Enabled = period.Enabled = chkdsk.Enabled = memtest.Enabled = maint.Enabled = wmi.Enabled = !busy;
+            collect.Enabled = period.Enabled = tools.Enabled = !busy;
             copyAll.Enabled = copySummary.Enabled = copyScreen.Enabled = toggle.Enabled = !busy && last != null;
             openTxt.Enabled = openFolder.Enabled = !busy && last != null && last.SavedPath != null;
             UseWaitCursor = busy;

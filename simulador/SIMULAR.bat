@@ -7,13 +7,16 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-set LOG=%~dp0simulador-log.txt
+set DIAG=%~dp0..\DiagBIG.exe
+set OUT=%~dp0..\DiagBIG_relatorios
+if not exist "%DIAG%" set OUT=%~dp0DiagBIG_relatorios
+if not exist "%OUT%" mkdir "%OUT%"
+set LOG=%OUT%\Simulador_log.txt
 echo ==== %date% %time% ==== >> "%LOG%"
 ver >> "%LOG%"
 whoami >> "%LOG%"
 echo pasta: %~dp0 >> "%LOG%"
 set PS=powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0simular.ps1"
-set DIAG=%~dp0..\DiagBIG.exe
 if not exist "%DIAG%" set DIAG=%~dp0DiagBIG.exe
 
 :menu
@@ -61,6 +64,7 @@ echo   T - TODOS DE UMA VEZ: 14, 15, 16, 18, 6, 10, 12, coleta, mostra tudo e re
 echo  Coleta e limpeza:
 echo   C - Rodar o DiagBIG (sem janela) e mostrar N1, ONDE ESTA O PROBLEMA, relogio, unidade
 echo   G - Rodar o DiagBIG COM janela (ver botoes Testar memoria e Verificar disco)
+echo   R - RELATORIO DE TESTE: junta estado do my.ini/servico (27), do WMI (30) e o fim do log (Simulador_relatorio-teste_*.txt)
 echo   L - LIMPAR o log Sistema (so em VM de teste: apaga os eventos simulados)
 echo   0 - Sair
 set /p op=Escolha: 
@@ -70,6 +74,7 @@ if /i "%op%"=="G" goto janela
 if /i "%op%"=="L" goto limpar
 if /i "%op%"=="T" goto todos
 if /i "%op%"=="N" goto casos
+if /i "%op%"=="R" goto relteste
 if "%op%"=="25" goto preparabotao
 echo opcao %op% >> "%LOG%"
 %PS% -Cenario %op% >> "%LOG%" 2>&1
@@ -90,6 +95,23 @@ echo opcao 25 >> "%LOG%"
 powershell -NoProfile -Command "Get-Content '%LOG%' -Tail 8"
 goto menu
 
+:relteste
+for /f %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set TS=%%t
+set RT=%OUT%\Simulador_relatorio-teste_%TS%.txt
+echo ===== RELATORIO DE TESTE %date% %time% ===== > "%RT%"
+echo. >> "%RT%"
+echo --- estado do my.ini e do servico do banco (opcao 27) >> "%RT%"
+%PS% -Cenario 27 >> "%RT%" 2>&1
+echo. >> "%RT%"
+echo --- estado do repositorio WMI (opcao 30) >> "%RT%"
+%PS% -Cenario 30 >> "%RT%" 2>&1
+echo. >> "%RT%"
+echo --- ultimas linhas do log do simulador (comandos e resultados das opcoes) >> "%RT%"
+powershell -NoProfile -Command "Get-Content '%LOG%' -Tail 80" >> "%RT%"
+echo.
+echo Salvo em %RT%. Tudo (relatorios, Procedimento_*, Simulador_*) fica em %OUT% - e so copiar essa pasta.
+goto menu
+
 :janela
 if not exist "%DIAG%" (echo DiagBIG.exe nao encontrado. & goto menu)
 start "" "%DIAG%"
@@ -108,11 +130,11 @@ if not exist "%DIAG%" (echo DiagBIG.exe nao encontrado. & goto menu)
 echo coleta: %DIAG% >> "%LOG%"
 "%DIAG%" --sem-janela >> "%LOG%" 2>&1
 echo (DiagBIG saiu com %errorlevel%) >> "%LOG%"
-for /f "delims=" %%f in ('dir /b /o-d "%~dp0..\DiagBIG_relatorios\*.txt" "%~dp0DiagBIG_relatorios\*.txt" 2^>nul') do (set REL=%%f & goto achou)
+for /f "delims=" %%f in ('dir /b /o-d "%OUT%\DiagBIG_*.txt" 2^>nul') do (set REL=%%f & goto achou)
 echo Relatorio nao encontrado em DiagBIG_relatorios.
 goto menu
 :achou
-if exist "%~dp0..\DiagBIG_relatorios\%REL%" (set RP=%~dp0..\DiagBIG_relatorios\%REL%) else (set RP=%~dp0DiagBIG_relatorios\%REL%)
+set RP=%OUT%\%REL%
 echo Relatorio: %RP%
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0mostrar.ps1" -Arquivo "%RP%"
 goto menu
@@ -123,9 +145,9 @@ echo Isto APAGA os logs Sistema e Aplicativo desta VM (so em VM de teste), mexe 
 set /p ok=Digite SIM para continuar: 
 if /i not "%ok%"=="SIM" goto menu
 echo ==== 8 CASOS DO N1 ==== >> "%LOG%"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0casos.ps1" -Diag "%DIAG%" -Pasta "%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0casos.ps1" -Diag "%DIAG%" -Pasta "%~dp0" -Saida "%OUT%\Simulador_casos-resultado.txt"
 echo.
-echo Resultado salvo em %~dp0casos-resultado.txt (copie para o compartilhado).
+echo Resultado salvo em %OUT%\Simulador_casos-resultado.txt
 goto menu
 
 :todos
@@ -156,9 +178,9 @@ goto menu
 if not exist "%DIAG%" (echo DiagBIG.exe nao encontrado. & exit /b 1)
 "%DIAG%" --sem-janela >> "%LOG%" 2>&1
 set REL=
-for /f "delims=" %%f in ('dir /b /o-d "%~dp0..\DiagBIG_relatorios\*.txt" "%~dp0DiagBIG_relatorios\*.txt" 2^>nul') do (if not defined REL set REL=%%f)
+for /f "delims=" %%f in ('dir /b /o-d "%OUT%\DiagBIG_*.txt" 2^>nul') do (if not defined REL set REL=%%f)
 if not defined REL (echo Relatorio nao encontrado em DiagBIG_relatorios. & exit /b 1)
-if exist "%~dp0..\DiagBIG_relatorios\%REL%" (set RP=%~dp0..\DiagBIG_relatorios\%REL%) else (set RP=%~dp0DiagBIG_relatorios\%REL%)
+set RP=%OUT%\%REL%
 echo Relatorio: %RP%
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0mostrar.ps1" -Arquivo "%RP%"
 exit /b 0

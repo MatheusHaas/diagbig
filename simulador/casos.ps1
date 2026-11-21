@@ -1,8 +1,8 @@
 ﻿# Roda os 8 casos do N1 em sequencia na VM: prepara o cenario, coleta (--sem-janela --dias 7), confere "QUEM ACIONAR" e restaura.
-param([string]$Diag, [string]$Pasta)
+param([string]$Diag, [string]$Pasta, [string]$Saida)
 [Console]::OutputEncoding = [System.Text.Encoding]::GetEncoding(850)
 $Sim = Join-Path $Pasta "simular.ps1"
-$Saida = Join-Path $Pasta "casos-resultado.txt"
+if (-not $Saida) { $Saida = Join-Path $Pasta "Simulador_casos-resultado.txt" }
 $linhas = New-Object System.Collections.ArrayList
 function Say($t, $cor = $null) {
     [void]$linhas.Add($t)

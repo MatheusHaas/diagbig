@@ -114,10 +114,38 @@ namespace DiagBIG.UI
             DbTarget t = targets[svcBox.SelectedIndex];
             string force = (string)forceBox.SelectedItem;
             busy = true;
-            var th = new Thread(() => { try { Run(t, mode, force); } catch (Exception ex) { Append("\r\nERRO: " + ex.Message + "\r\n"); } finally { SetBusy(false); } });
+            var th = new Thread(() =>
+            {
+                int startAt = all.Length;
+                try { Run(t, mode, force); } catch (Exception ex) { Append("\r\nERRO: " + ex.Message + "\r\n"); }
+                try { SaveLog(t, mode, startAt); } catch (Exception) { }
+                SetBusy(false);
+            });
             th.IsBackground = true;
             SetBusy(true);
             th.Start();
+        }
+
+        /// <summary>Grava o que esta ação fez e o estado final (linhas do my.ini que importam, serviço e fim do .err) para o suporte conferir depois.</summary>
+        void SaveLog(DbTarget t, Mode mode, int startAt)
+        {
+            var sb = new StringBuilder();
+            sb.Append(all.ToString(startAt, all.Length - startAt));
+            sb.Append("\r\n==== ESTADO FINAL ====\r\n");
+            try
+            {
+                sb.Append("my.ini: ").Append(t.IniPath).Append("\r\n");
+                foreach (string l in File.ReadAllLines(t.IniPath))
+                    if (System.Text.RegularExpressions.Regex.IsMatch(l, @"^\s*(port|innodb_force_recovery|innodb_doublewrite|skip.innodb.doublewrite|innodb_flush_log_at_trx_commit)\s*(=|$)|DiagBIG"))
+                        sb.Append("  | ").Append(l).Append("\r\n");
+                sb.Append("backup .diagbig-original: ").Append(File.Exists(t.IniPath + OriginalSuffix) ? "existe" : "não existe").Append("\r\n");
+            }
+            catch (Exception ex) { sb.Append("(não consegui ler o my.ini: ").Append(ex.Message).Append(")\r\n"); }
+            try { using (var sc = new ServiceController(t.Service.Name)) { sc.Refresh(); sb.Append("serviço ").Append(t.Service.Name).Append(": ").Append(sc.Status).Append("\r\n"); } }
+            catch (Exception ex) { sb.Append("(serviço: ").Append(ex.Message).Append(")\r\n"); }
+            sb.Append("\n==== FIM DO .err (últimas 30 linhas) ").Append(t.ErrPath).Append(" ====\r\n").Append(ProcedureLog.Tail(t.ErrPath, 30)).Append("\r\n");
+            string saved = ProcedureLog.Save("manutencao-banco-" + (mode == Mode.Apply ? "aplicar" : mode == Mode.RemoveForce ? "tirar-force" : "restaurar"), SystemInfo.HostName(), sb.ToString());
+            Append("\r\n" + (saved != null ? "Relatório do procedimento salvo em " + saved : "Não consegui salvar o relatório do procedimento.") + "\r\n");
         }
 
         bool Confirm(string text)
@@ -185,11 +213,13 @@ namespace DiagBIG.UI
                     try { sc.Stop(); sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(90)); }
                     catch (Exception ex) { Append("Não consegui parar o serviço: " + ex.Message + ". Nada foi alterado no my.ini.\r\n"); return; }
                 }
-                if (mode == Mode.Restore) { File.Copy(original, ini, true); try { File.Delete(original); Append("my.ini original restaurado; o arquivo de backup foi apagado (o próximo teste guarda um novo).\r\n"); } catch (Exception) { } }
+                if (mode == Mode.Restore) { try { File.Copy(ini, ini + ".diagbig-antes-de-restaurar", true); Append("Guardei o my.ini atual em " + ini + ".diagbig-antes-de-restaurar (caso alguém o tenha editado).\r\n"); } catch (Exception) { } File.Copy(original, ini, true); try { File.Delete(original); Append("my.ini original restaurado; o arquivo de backup foi apagado (o próximo teste guarda um novo).\r\n"); } catch (Exception) { } }
                 else
                 {
                     // O backup só nasce agora (serviço já parado, tudo pronto para gravar): se algo falhar antes, não sobra backup velho.
-                    if (mode == Mode.Apply && !File.Exists(original)) { File.Copy(ini, original); Append("Backup do original: " + original + "\r\n"); }
+                    // Backup velho (o my.ini atual não tem marca do DiagBIG = não foi mexido por nós): é de outro atendimento, troca pelo atual.
+                    if (mode == Mode.Apply && (!File.Exists(original) || !ReadIni(ini, out enc, out bom).Contains("# DiagBIG")))
+                    { File.Copy(ini, original, true); Append("Backup do original: " + original + "\r\n"); }
                     WriteIni(ini, newText, enc, bom); Append("my.ini gravado.\r\n");
                 }
 
@@ -222,6 +252,18 @@ namespace DiagBIG.UI
             }
         }
 
+        static string ReadErrFrom(string path, long pos)
+        {
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                if (pos > fs.Length) pos = 0; // .err novo/rotacionado
+                fs.Position = pos;
+                var ms = new MemoryStream(); fs.CopyTo(ms);
+                string e; byte[] b = ms.ToArray();
+                return ErrTailReader.Decode(b, 0, b.Length, out e);
+            }
+        }
+
         static bool ServiceDisabled(string name)
         {
             try
@@ -241,17 +283,12 @@ namespace DiagBIG.UI
             {
                 try
                 {
-                    string txt;
-                    using (var fs = new FileStream(t.ErrPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-                    {
-                        if (errPos > fs.Length) errPos = 0; // .err novo/rotacionado
-                        fs.Position = errPos;
-                        var ms = new MemoryStream(); fs.CopyTo(ms);
-                        string e; byte[] b = ms.ToArray();
-                        txt = ErrTailReader.Decode(b, 0, b.Length, out e);
-                    }
+                    string txt = ReadErrFrom(t.ErrPath, errPos);
                     ErrAnalysis a = ErrLogAnalyzer.Analyze(txt, DateTime.MinValue);
-                    tables = Diagnosis.DamagedTables(a.Occurrences);
+                    // Tabelas: .err recente inteiro (até 1 MB do fim), pois os erros de tabela costumam ser de antes desta subida.
+                    long fl = new FileInfo(t.ErrPath).Length;
+                    ErrAnalysis recent = ErrLogAnalyzer.Analyze(ReadErrFrom(t.ErrPath, Math.Max(0, fl - 1048576)), DateTime.MinValue);
+                    tables = Diagnosis.DamagedTables(recent.Occurrences);
                     foreach (Occurrence o in a.Occurrences)
                         foreach (string term in NotOnlyTable)
                             if ((o.Message ?? "").IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0 && !other.Contains(term)) other.Add(term);
@@ -266,9 +303,9 @@ namespace DiagBIG.UI
                        ". Deixar mais alguns minutos observando o .err; se operar normal, o N2 volta a porta para 3306 e roda bigupdate, acertaestrutura e acertasequenciador.") + "\r\n");
             else if (!everRunning) Append("NÃO SUBIU. " + (mode == Mode.Apply ? "Tentar force 2 (se foi 1). Se não subir com 2: EQUIPE TÉCNICA (não usar 3 ou mais)." : "Voltar o force (botão 1) e repetir o reparo, ou EQUIPE TÉCNICA.") + "\r\n");
             else Append("SUBIU MAS CAIU (" + drops + " queda(s) em " + ObserveSeconds + " s): loop de subir e cair. " + (mode == Mode.Apply ? "Tentar force 2 (se foi 1); se continuar: não é só tabela, EQUIPE TÉCNICA." : "Voltar o force e repetir o reparo; se continuar, EQUIPE TÉCNICA.") + "\r\n");
-            if (tables.Count > 0)
+            if (tables.Count > 0 && mode == Mode.Apply)
             {
-                Append("Tabelas com corrupção no .err desta subida (" + tables.Count + "):\r\n");
+                Append("Tabelas com corrupção no .err recente (" + tables.Count + "):\r\n");
                 foreach (string tb in tables.Take(50)) Append("  " + tb + "\r\n");
                 Append("N2: OPTIMIZE TABLE <tabela>; ou ALTER TABLE <tabela> ENGINE=InnoDB; só nelas.\r\n");
             }
