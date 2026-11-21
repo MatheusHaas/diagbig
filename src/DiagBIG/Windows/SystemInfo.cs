@@ -26,6 +26,26 @@ namespace DiagBIG.Windows
             return Environment.MachineName;
         }
 
+        /// <summary>IPv4 das placas ativas (sem loopback, túnel nem endereço automático 169.254), ex.: "192.168.0.10 (Ethernet)".</summary>
+        public static List<string> IpAddresses()
+        {
+            var res = new List<string>();
+            foreach (System.Net.NetworkInformation.NetworkInterface ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up) continue;
+                if (ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback ||
+                    ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Tunnel) continue;
+                foreach (System.Net.NetworkInformation.UnicastIPAddressInformation ua in ni.GetIPProperties().UnicastAddresses)
+                {
+                    if (ua.Address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork) continue;
+                    string ip = ua.Address.ToString();
+                    if (ip.StartsWith("169.254.", StringComparison.Ordinal)) continue;
+                    res.Add(ip + " (" + ni.Name + ")");
+                }
+            }
+            return res;
+        }
+
         public static string WindowsVersion()
         {
             try

@@ -14,6 +14,7 @@ namespace DiagBIG.Windows
         public ReportData Data;
         public string FullText;
         public string ResumoText;
+        public string EssentialText;
         public string SavedPath;   // null = não conseguiu gravar
         public string SaveError;
     }
@@ -40,6 +41,7 @@ namespace DiagBIG.Windows
             progress("Lendo informações do sistema...");
             d.WindowsVersion = SystemInfo.WindowsVersion();
             try { d.Os = SystemInfo.ReadOs(); } catch (Exception) { }
+            try { d.IpAddresses.AddRange(SystemInfo.IpAddresses()); } catch (Exception) { }
             try { d.OsInstalled = SystemInfo.OsInstallDate(); } catch (Exception) { }
             try { d.Drives.AddRange(SystemInfo.FixedDrives()); }
             catch (Exception ex) { d.DrivesError = ex.Message; }
@@ -290,6 +292,7 @@ namespace DiagBIG.Windows
             d.Sections.Add(evSection);
 
             progress("Montando relatório...");
+            d.DisabledDbServices.AddRange(services.Where(x => x.StartType == "DESATIVADO").Select(x => x.Name));
             d.DbServiceRunning = services.Count == 0 ? (bool?)null : services.Any(s => s.Status == "rodando");
             try { d.Hypotheses.AddRange(Hypotheses.Analyze(d)); } catch (Exception) { }
             try { d.Diagnosis.AddRange(Diagnosis.Analyze(d)); } catch (Exception) { }
@@ -297,6 +300,7 @@ namespace DiagBIG.Windows
             var r = new CollectionResult { Data = d };
             r.FullText = ReportBuilder.BuildFull(d);
             r.ResumoText = ReportBuilder.BuildResumo(d);
+            r.EssentialText = ReportBuilder.BuildEssential(d);
             string err;
             r.SavedPath = Save(r.FullText, d.OutputFileName, out err);
             r.SaveError = err;
@@ -307,6 +311,8 @@ namespace DiagBIG.Windows
         {
             var b = new ReportBlock { Title = t.Label, IsEvents = false };
             b.Info.AddRange(t.Info);
+            if (t.Service != null && t.Service.StartType == "DESATIVADO")
+                b.Info.Add("AVISO: " + ActionPlan.DisabledServiceText(new[] { t.Service.Name }));
             if (!string.IsNullOrEmpty(t.DataDir))
             {
                 try

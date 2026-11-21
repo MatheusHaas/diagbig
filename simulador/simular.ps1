@@ -180,6 +180,71 @@ function Banco-Novo-Restaurar {
     }
 }
 
+# 23/24: enche o C: ate sobrar ~4 GB (alerta POUCO ESPACO, caso "N1 resolve") e depois apaga o arquivo.
+$EncheArq = "C:\diagbig-enche.bin"
+function Encher-C {
+    if (Test-Path $EncheArq) { Write-Host "O arquivo de enchimento ja existe: $EncheArq"; return }
+    $livre = [System.IO.DriveInfo]::new("C").AvailableFreeSpace
+    $tam = $livre - 4GB
+    if ($tam -le 0) { Write-Host "O C: ja tem menos de 4 GB livres; nada a fazer."; return }
+    & fsutil.exe file createnew $EncheArq $tam | ForEach-Object { Write-Host ("  fsutil: " + $_) }
+    Write-Host ("C: agora tem " + [math]::Round([System.IO.DriveInfo]::new("C").AvailableFreeSpace / 1GB, 1) + " GB livres")
+}
+function Encher-C-Remover {
+    if (Test-Path $EncheArq) { Remove-Item $EncheArq -Force; Write-Host "Arquivo de enchimento removido." } else { Write-Host "Nada para remover." }
+}
+
+# ---- Botao "Manutencao do banco (force 3307)" do DiagBIG 1.7.0 ----
+# 25: prepara o caso 2 (tabela quebrada no .err) + my.ini com doublewrite=OFF e flush=2, para clicar no botao.
+function Botao-Preparar {
+    Write-Host "Preparando: tabela quebrada no .err (cenario 3) e my.ini com doublewrite=OFF/flush=2 (cenario 10)."
+    Linhas-Err @(
+      "8 [ERROR] mysqld: Table '.\loja\movimento' is marked as crashed and should be repaired",
+      "9 [ERROR] mysqld: Table '.\loja\movimento' is marked as crashed and should be repaired",
+      "9 [ERROR] Got error 145 when reading table '.\loja\estoque'")
+    Ini-Risco
+    Write-Host "Pronto. Agora: DiagBIG.exe (opcao G) > 'Manutencao do banco (force 3307)' > botao 1; depois a opcao 27 mostra o estado." -ForegroundColor Green
+}
+
+# 27: mostra o estado do my.ini (linhas que o botao mexe, comentarios DiagBIG, arquivos de backup) e do servico.
+function Botao-Estado {
+    $f = Achar-Ini
+    if (-not $f) { Write-Host "NAO ACHEI o my.ini." -ForegroundColor Red; return }
+    Write-Host "my.ini: $f"
+    foreach ($suf in @(".diagbig-original", ".bak-diagbig")) { Write-Host ("  " + $suf + ": " + $(if (Test-Path ($f + $suf)) { "EXISTE" } else { "nao existe" })) }
+    Get-Content -Path $f -Encoding Default | Where-Object { $_ -match '^\s*(port|innodb_force_recovery|innodb_doublewrite|skip.innodb.doublewrite|innodb_flush_log_at_trx_commit)\s*(=|$)|DiagBIG' } |
+        ForEach-Object { Write-Host ("  | " + $_) }
+    $svc = Servico-Banco
+    if ($svc) { Write-Host ("Servico " + $svc.Name + ": " + (Get-Service -Name $svc.Name).Status) }
+}
+
+# 26: desfaz TUDO do teste do botao: my.ini (o guardado pelo botao e depois o do simulador), .err, e deixa o servico rodando.
+function Botao-Limpar {
+    $f = Achar-Ini
+    $svc = Servico-Banco
+    if ($svc -and (Get-Service -Name $svc.Name).Status -ne 'Stopped') {
+        Write-Host "Parando o servico $($svc.Name) ..."
+        Stop-Service -Name $svc.Name -Force -ErrorAction SilentlyContinue
+        try { (Get-Service -Name $svc.Name).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) } catch { }
+    }
+    if ($f) {
+        foreach ($suf in @(".diagbig-original", ".bak-diagbig")) {
+            if (Test-Path ($f + $suf)) { Copy-Item ($f + $suf) $f -Force; Remove-Item ($f + $suf); Write-Host "Restaurado de $suf" }
+        }
+        $sobra = @(Get-Content -Path $f -Encoding Default | Where-Object { $_ -match '^\s*innodb_force_recovery\s*=' -or $_ -match '^\s*port\s*=\s*3307' })
+        if ($sobra.Count -gt 0) { Write-Host "ATENCAO: o my.ini ainda tem force/porta 3307 (ja estava assim antes do teste?): $($sobra -join ' | ')" -ForegroundColor Yellow }
+    } else { Write-Host "NAO ACHEI o my.ini." -ForegroundColor Red }
+    $e = Achar-Err
+    if ($e -and (Test-Path ($e + ".bak-diagbig"))) { Copy-Item ($e + ".bak-diagbig") $e -Force; Remove-Item ($e + ".bak-diagbig"); Write-Host "Restaurado o .err: $e" }
+    if ($svc) {
+        Write-Host "Subindo o servico $($svc.Name) ..."
+        Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
+        try { (Get-Service -Name $svc.Name).WaitForStatus('Running', [TimeSpan]::FromSeconds(60)) } catch { }
+        Write-Host ("Servico: " + (Get-Service -Name $svc.Name).Status)
+    }
+    Write-Host "Limpeza do teste do botao concluida." -ForegroundColor Green
+}
+
 switch ($Cenario) {
  1 { Evento "disk" 7 "O dispositivo \Device\Harddisk0\DR0 tem um bloco invalido (bad block)." }
  2 { Evento "Ntfs" 55 "Corrupcao detectada na estrutura do sistema de arquivos, no volume ??." }
@@ -220,5 +285,12 @@ switch ($Cenario) {
  18 { Banco-Novo }
  19 { Banco-Novo-Restaurar }
  20 { Evento "disk" 7 "O dispositivo tem um bloco invalido (bad block)." }
+ 21 { Evento "BugCheck" 1001 "O computador foi reiniciado depois de uma verificacao de bug. A verificacao de bug foi: 0x000000d1 (0x0000000000000008, 0x0000000000000002, 0x0000000000000000, 0xfffff80012345678)." }
+ 22 { Evento "EventLog" 6008 ("O desligamento anterior do sistema em " + (Get-Date).AddMinutes(-20).ToString("HH:mm:ss") + " de " + (Get-Date).ToString("dd/MM/yyyy") + " foi inesperado.") }
+ 23 { Encher-C }
+ 24 { Encher-C-Remover }
+ 25 { Botao-Preparar }
+ 26 { Botao-Limpar }
+ 27 { Botao-Estado }
  default { Write-Host "Cenario invalido." }
 }

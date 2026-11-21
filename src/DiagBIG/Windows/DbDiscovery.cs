@@ -32,6 +32,8 @@ namespace DiagBIG.Windows
         public readonly List<string> Info = new List<string>();
         /// <summary>Opções lidas do my.ini (null = nenhum my.ini lido).</summary>
         public MyIniOptions Options;
+        /// <summary>my.ini que o botão de manutenção edita (o último lido, que prevalece). null = nenhum.</summary>
+        public string IniPath;
     }
 
     /// <summary>Localiza serviços MySQL/MariaDB e seus .err. Só leitura (registro e sistema de arquivos).</summary>
@@ -136,7 +138,7 @@ namespace DiagBIG.Windows
                 catch (Exception ex) { t.Info.Add("AVISO: não foi possível ler " + f + ": " + ex.Message); }
             }
             MyIniOptions opt = MyIniParser.Merge(parsed);
-            if (read.Count > 0) t.Options = opt;
+            if (read.Count > 0) { t.Options = opt; t.IniPath = read[read.Count - 1]; }
             if (read.Count == 0) t.Info.Add("Config ........: nenhum my.ini/my.cnf encontrado (usando padrões)");
             else if (fromDefaultsFile) t.Info.Add("Config ........: " + read[0] + " (--defaults-file)");
             else t.Info.Add("Config ........: " + string.Join(" + ", read.ToArray()) +

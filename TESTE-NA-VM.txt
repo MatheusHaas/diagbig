@@ -145,6 +145,54 @@ N) ROTEIRO RAPIDO COM O SIMULADOR (1.6.7) - pasta simulador\, SIMULAR.bat como A
    Janela: opcao G abre o DiagBIG com janela: botao "Testar memoria (mdsched)" (responder Nao, ou Sim e fechar o mdsched) e
      "Verificar disco". Obs.: bad block e Ntfs 55 antigos (fora do periodo) nao tem como simular: Write-EventLog grava com a data de agora.
 
+N) 1.7.0 - TELA ESSENCIAL POR CASO - simulador\SIMULAR.bat como ADMINISTRADOR, opcao N (8 casos em sequencia)
+   Antes: copiar o DiagBIG.exe (1.7.0) para a pasta DiagBIG da VM (o simulador usa o exe da pasta de cima).
+   A opcao N pede SIM e depois, para cada caso: limpa os logs Sistema e Aplicativo, aplica o cenario, coleta (--sem-janela --dias 7),
+   mostra o texto da tela inicial, confere "QUEM ACIONAR" e restaura. No fim imprime o RESUMO DOS CASOS (OK/DIVERGENTE) e salva
+   simulador\casos-resultado.txt (copie para o compartilhado). Leva uns 10 a 15 minutos. Os casos:
+     1  nada (logs limpos) ............ QUEM ACIONAR: NINGUEM POR ESTE RELATORIO
+     2  cenario 3 (tabela quebrada) ... N2 SISTEMA, "innodb_force_recovery=1 ou 2", porta 3307, "Apos as 20:00: ... EQUIPE TECNICA"
+                                     + roteiro do N2: doublewrite=ON, ALTER TABLE, "TIRAR o innodb_force_recovery", bigupdate/acertaestrutura/acertasequenciador
+     3  cenario 1 (bad block) ......... EQUIPE TECNICA, TROCAR O SERVIDOR/DISCO, "DISCO COM ERRO" e reinicios
+     4  cenario 6 (ibdata1/redo log) .. EQUIPE TECNICA, REINSTALAR NO MESMO TERMINAL
+     5  cenario 21 (tela azul 0xD1) ... N2 SISTEMA, reparo simples (DISM e SFC), "Apos as 20:00"
+     6  cenario 22 (EventLog 6008) .... TECNICO DA FARMACIA, no-break/fonte/CR2032
+     7a cenario 23 (C: com 4 GB) ...... N1 (RESOLVE SOZINHO), liberar espaco em C:
+     7b cenario 12 (relogio) .......... N1 (RESOLVE SOZINHO), acertar data/hora; se voltar a errar, tecnico da farmacia (CR2032)
+   Se algum cenario nao gravar o evento (21 usa a fonte BugCheck, 22 usa EventLog), o log da opcao mostra o erro: anote e avise.
+   O caso 1 pode sair diferente se o .err do banco da VM tiver dano real dentro dos ultimos 7 dias (e historico da VM, nao do DiagBIG).
+   Depois abra o DiagBIG.exe com janela (opcao G): ele abre no essencial; "Mostrar relatorio completo" alterna; "Copiar tela" copia o
+   que esta visivel; "Copiar resumo" e "Copiar tudo" continuam. A linha IP aparece na IDENTIFICACAO (tela e TXT).
+   As opcoes 21 a 24 rodam separadas (24 remove o arquivo que enche o C:).
+
+N) 1.7.0 - BOTAO "Manutencao do banco (force 3307)" (caso 2, so tabelas) - na VM, DiagBIG.exe com janela, como administrador
+   PELO SIMULADOR (simulador\SIMULAR.bat como administrador):
+     25  pede SIM e LIMPA os logs Sistema e Aplicativo (tira os eventos de disk 7/153 e Ntfs 55 de testes antigos, senao o caso vira
+         TROCAR DISCO); depois grava no .err as tabelas quebradas (loja.movimento, loja.estoque) e poe no my.ini innodb_doublewrite=OFF e
+         innodb_flush_log_at_trx_commit=2 (faz copia .bak-diagbig e reinicia o servico).
+     C   (opcional) coletar: deve dar N2 SISTEMA, "só tabelas", e o roteiro de 8 passos com bigupdate/acertaestrutura/acertasequenciador.
+     G   abrir o DiagBIG com janela e usar o botao (passos 1 a 4 abaixo). O force 1 ou 2 e a porta 3307 sao o que o botao aplica.
+     27  mostra o estado a qualquer momento: port, innodb_force_recovery, doublewrite, flush, comentarios "# DiagBIG", .diagbig-original e servico.
+         Esperado depois do passo 1: port=3307, force=1, doublewrite=ON, flush=1, .diagbig-original EXISTE.
+         Depois do passo 2: sem innodb_force_recovery, port=3307. Depois do passo 4 (Restaurar): my.ini igual ao de depois do 25.
+     26  LIMPAR TUDO: restaura o my.ini (primeiro o .diagbig-original do botao, depois o .bak-diagbig do simulador), restaura o .err,
+         apaga os arquivos de backup e deixa o servico rodando. Rodar no fim. Conferir com 27: sem force, sem porta 3307, sem backups.
+   Servico DESATIVADO: o botao NAO ativa nem altera o servico; so avisa "Confirmar se nao consta troca de servidor recente. NAO ativar." e nao muda nada.
+   Relatorio com servico DESATIVADO: no services.msc colocar o servico do banco em "Desativado" (so numa VM de teste), coletar: na tela essencial
+     e no TXT aparece "ATENCAO SERVICO DO BANCO DESATIVADO (<nome>): confirmar se nao consta troca de servidor recente ... e NAO ativar", e no bloco
+     do banco a linha "AVISO: ...". O destino (QUEM ACIONAR) nao muda. Voltar o servico para Automatico depois.
+   Sem o simulador: guardar uma copia do my.ini da VM. O botao fica na barra de baixo; pede confirmacao ao abrir e a cada acao.
+   1) Botao "1) Aplicar force e testar subida (30 s)" com force 1: a confirmacao lista as alteracoes (ex.: "innodb_doublewrite=OFF -> innodb_doublewrite=ON",
+      "port=3306 -> port=3307", "(nao definido) -> innodb_force_recovery=1"). Confirmando: cria my.ini.diagbig-original (so na 1a vez), para o servico,
+      grava o my.ini, inicia e mostra "serviço Running" por 30 s. Esperado: "SUBIU E FICOU ESTAVEL por 30 s com force na porta 3307".
+      No my.ini ficam comentarios "# DiagBIG dd/mm/aaaa hh:mm: era ..." acima de cada linha trocada. Linhas de [client] nao mudam.
+   2) Para simular "nao sobe": colocar innodb_force_recovery=7 (invalido) ou apagar o ibdata1 de uma copia; esperado "NAO SOBE" e a sugestao de force 2/equipe tecnica.
+      Colocar no .err (antes de clicar) uma linha "InnoDB: Database page corruption on disk ... table `loja`.`clientes`" nao basta: o botao so le o que o .err
+      ganhar DEPOIS do reinicio (use o cenario 3 do simulador e depois o botao: a lista de tabelas aparece se o banco regravar o erro ao subir).
+   3) Botao "2) Tirar o force e testar (porta 3307)": a linha innodb_force_recovery vira comentario "# DiagBIG: removido ...", port=3307 continua. Esperado: "SUBIU E FICOU ESTAVEL".
+   4) Botao "Restaurar my.ini original": volta o my.ini guardado (porta 3306 de novo), reinicia e confirma estavel. Conferir que o sistema/base abre.
+   5) O botao NAO roda OPTIMIZE/ALTER nem bigupdate/acertaestrutura/acertasequenciador: isso continua manual (N2). Tela essencial do caso 2 mostra o roteiro de 8 passos.
+
 N) TESTE COMPLETO DE UMA VEZ (1.6.8) - simulador\SIMULAR.bat como ADMINISTRADOR, opcao T
    A opcao T roda os cenarios 14, 15, 16, 18, 6, 10 e 12 em sequencia, coleta sem janela, mostra o resultado e restaura tudo
    (11, 9, 19 e 17). Leva alguns minutos (o banco e parado e iniciado varias vezes). Depois copie o TXT mais recente de

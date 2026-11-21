@@ -142,30 +142,9 @@ namespace DiagBIG.Core
                 sb.Append(NL).Append("  Detalhes técnicos abaixo.").Append(NL).Append(NL);
             }
 
-            Title(sb, "IDENTIFICAÇÃO");
-            sb.Append("  PC ............: ").Append(d.ComputerName).Append(NL);
-            sb.Append("  WINDOWS .......: ").Append(d.WindowsVersion).Append(NL);
-            sb.Append("  COLETA ........: ").Append(DateTimeLong(d.CollectedAt)).Append(NL);
-            sb.Append("  PERÍODO .......: últimos ").Append(d.PeriodDays).Append(" dias (desde ").Append(DateTimeShort(d.Since)).Append(')').Append(NL);
-            if (d.Raid != null || d.RaidError != null)
-                sb.Append("  RAID ..........: ").Append(Storage.RaidLine(d.Raid, d.RaidError)).Append(NL);
-            if (d.LastBoot != null)
-                sb.Append("  LIGADO DESDE ..: ").Append(DateTimeShort(d.LastBoot)).Append(" (último boot completo)").Append(NL);
-            if (!string.IsNullOrEmpty(d.OutputFileName))
-                sb.Append("  ARQUIVO .......: ").Append(d.OutputFileName).Append(NL);
-            sb.Append(NL);
-
-            var osLines = OsRules.Lines(d.Os, d.CollectedAt);
-            if (osLines.Count > 0)
-            {
-                Title(sb, "SISTEMA OPERACIONAL");
-                foreach (string ol in osLines) sb.Append(ol).Append(NL);
-                sb.Append(NL);
-            }
-
-            Title(sb, "UNIDADES");
-            if (d.DrivesError != null) sb.Append("  NÃO VERIFICADO: ").Append(d.DrivesError).Append(NL);
-            foreach (string dr in d.Drives) sb.Append("  ").Append(dr).Append(NL);
+            AppendIdent(sb, d, false);
+            AppendOs(sb, d);
+            AppendDrives(sb, d);
 
             sb.Append(NL);
             Title(sb, "COBERTURA DOS LOGS");
@@ -209,6 +188,129 @@ namespace DiagBIG.Core
                 sb.Append(NL);
             }
             sb.Append(NL);
+            return sb.ToString();
+        }
+
+        static void AppendIdent(StringBuilder sb, ReportData d, bool essential)
+        {
+            Title(sb, "IDENTIFICAÇÃO");
+            sb.Append("  PC ............: ").Append(d.ComputerName).Append(NL);
+            if (d.IpAddresses.Count > 0)
+                sb.Append("  IP ............: ").Append(string.Join("; ", d.IpAddresses.ToArray())).Append(NL);
+            sb.Append("  WINDOWS .......: ").Append(d.WindowsVersion).Append(NL);
+            sb.Append("  COLETA ........: ").Append(DateTimeLong(d.CollectedAt)).Append(NL);
+            if (!essential)
+                sb.Append("  PERÍODO .......: últimos ").Append(d.PeriodDays).Append(" dias (desde ").Append(DateTimeShort(d.Since)).Append(')').Append(NL);
+            if (!essential && (d.Raid != null || d.RaidError != null))
+                sb.Append("  RAID ..........: ").Append(Storage.RaidLine(d.Raid, d.RaidError)).Append(NL);
+            if (d.LastBoot != null)
+                sb.Append("  LIGADO DESDE ..: ").Append(DateTimeShort(d.LastBoot)).Append(" (último boot completo)").Append(NL);
+            if (!essential && !string.IsNullOrEmpty(d.OutputFileName))
+                sb.Append("  ARQUIVO .......: ").Append(d.OutputFileName).Append(NL);
+            sb.Append(NL);
+        }
+
+        static void AppendOs(StringBuilder sb, ReportData d)
+        {
+            var osLines = OsRules.Lines(d.Os, d.CollectedAt);
+            if (osLines.Count > 0)
+            {
+                Title(sb, "SISTEMA OPERACIONAL");
+                foreach (string ol in osLines) sb.Append(ol).Append(NL);
+                sb.Append(NL);
+            }
+        }
+
+        static void AppendDrives(StringBuilder sb, ReportData d)
+        {
+            Title(sb, "UNIDADES");
+            if (d.DrivesError != null) sb.Append("  NÃO VERIFICADO: ").Append(d.DrivesError).Append(NL);
+            foreach (string dr in d.Drives) sb.Append("  ").Append(dr).Append(NL);
+        }
+
+        // ---------------- TELA INICIAL (só o necessário de cada encaminhamento) ----------------
+
+        static void SummaryLines(StringBuilder sb, ReportData d, bool onlyIfNotOk, params string[] labels)
+        {
+            foreach (string label in labels)
+                foreach (SummaryItem s in d.Summary.Where(x => x.Label != null && x.Label.StartsWith(label, StringComparison.Ordinal)))
+                    if (!onlyIfNotOk || s.Status != CheckStatus.Ok)
+                        AppendWrapped(sb, s.Label + ": " + StatusText(s.Status) + Dash + s.Text, "  ", 100);
+        }
+
+        /// <summary>
+        /// Texto da tela ao abrir: título, quem acionar, o que fazer, identificação (com IP), sistema, unidades e só o bloco
+        /// que o encaminhamento precisa. O resto continua no relatório completo (TXT e botão "Mostrar relatório completo").
+        /// </summary>
+        public static string BuildEssential(ReportData d)
+        {
+            var sb = new StringBuilder();
+            sb.Append(Sep).Append(NL).Append("  DIAGBIG v").Append(Config.Version).Append(Dash).Append("O ESSENCIAL PARA O N1").Append(NL).Append(Sep).Append(NL).Append(NL);
+
+            Title(sb, "QUEM ACIONAR");
+            sb.Append("  ").Append(d.N1Dest ?? "NINGUÉM POR ESTE RELATÓRIO (nenhum indício forte nos logs lidos)").Append(NL).Append(NL);
+
+            if (d.N1.Count > 0)
+            {
+                Title(sb, "PARA O N1: O QUE FAZER AGORA");
+                foreach (string l in d.N1) AppendWrapped(sb, l, "  ");
+                sb.Append(NL);
+            }
+
+            AppendIdent(sb, d, true);
+            AppendOs(sb, d);
+            AppendDrives(sb, d);
+            sb.Append(NL);
+
+            var extra = new StringBuilder();
+            string title = null;
+            switch (d.N1Kind)
+            {
+                case N1Case.TrocarDisco:
+                    title = "DISCO E REINÍCIOS";
+                    foreach (string l in d.Sections.SelectMany(s => s.Blocks).SelectMany(b => b.Info).Where(i => i != null && i.StartsWith("DISCO COM ERRO", StringComparison.Ordinal)).Distinct())
+                        AppendWrapped(extra, l, "  ", 100);
+                    SummaryLines(extra, d, false, "DISCO", "DESLIGAMENTOS INESPERADOS", "LIGA/DESLIGA");
+                    SummaryLines(extra, d, true, "SMART", "MEMÓRIA/HARDWARE");
+                    break;
+                case N1Case.Tabelas:
+                    title = "BANCO: O QUE O N2 FAZ";
+                    SummaryLines(extra, d, false, "BANCO");
+                    {
+                        int k = 0;
+                        foreach (string st in ActionPlan.TableRoute(null))
+                            AppendWrapped(extra, (++k) + ". " + st, "  ", 100);
+                    }
+                    break;
+                case N1Case.Reinstalar:
+                    title = "BANCO";
+                    SummaryLines(extra, d, false, "BANCO");
+                    foreach (DiagItem it in d.Diagnosis.Where(i => i.Verdict != DiagVerdict.SemIndicio && (i.Area.StartsWith("ARQUIVOS") || i.Area.StartsWith("MOTOR") || i.Area.StartsWith("TABELA"))))
+                        AppendWrapped(extra, "[" + VerdictText(it.Verdict) + "] " + it.Area + ": " + OneLine(it.Evidence, 160), "  ", 100);
+                    SummaryLines(extra, d, true, "MEMÓRIA/HARDWARE");
+                    break;
+                case N1Case.ReparoWindows:
+                    title = "REPARO DO WINDOWS";
+                    SummaryLines(extra, d, false, "REPARO DO WINDOWS", "DESLIGAMENTOS INESPERADOS");
+                    SummaryLines(extra, d, true, "MEMÓRIA/HARDWARE", "RELÓGIO");
+                    AppendWrapped(extra, "Comandos (como administrador): DISM /Online /Cleanup-Image /RestoreHealth e depois sfc /scannow; reiniciar.", "  ", 100);
+                    break;
+                case N1Case.Energia:
+                    title = "REINÍCIOS E ENERGIA";
+                    SummaryLines(extra, d, false, "DESLIGAMENTOS INESPERADOS", "LIGA/DESLIGA");
+                    SummaryLines(extra, d, true, "RELÓGIO");
+                    break;
+                case N1Case.N1Sozinho:
+                    title = "O QUE O N1 CONFERE";
+                    SummaryLines(extra, d, true, "RELÓGIO");
+                    break;
+            }
+            if (title != null && extra.Length > 0)
+            {
+                Title(sb, title);
+                sb.Append(extra).Append(NL);
+            }
+            sb.Append("  Mais detalhes: botão \"Mostrar relatório completo\" ou o TXT salvo.").Append(NL);
             return sb.ToString();
         }
 

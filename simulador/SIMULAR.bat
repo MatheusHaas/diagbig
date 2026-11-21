@@ -18,7 +18,7 @@ if not exist "%DIAG%" set DIAG=%~dp0DiagBIG.exe
 
 :menu
 echo.
-echo ===== SIMULADOR DiagBIG 1.6.8 =====
+echo ===== SIMULADOR DiagBIG 1.7.0 =====
 echo  Eventos do Windows:
 echo   1 - Disco: bad block (disk 7, com ID Harddisk0\DR0)   -^> TROCAR DISCO
 echo   2 - NTFS 55 com "volume ??" (sem unidade)               -^> Unidade NAO INFORMADA
@@ -43,6 +43,16 @@ echo  17 - REMOVER o volume de 50 MB
 echo  18 - Banco "recem-instalado" (ibdata1 criado agora)     -^> BANCO NOVO JA CORROMPENDO (com 6 e 14)
 echo  19 - RESTAURAR a data de criacao do ibdata1
 echo  20 - Bad block SEM \Device\Harddisk no texto           -^> "o PC tem so um: modelo"
+echo  Casos do N1 (1.7.0):
+echo  21 - Tela azul de driver (BugCheck 0xD1)                -^> caso REPARO DO WINDOWS (N2)
+echo  22 - Desligamento inesperado (EventLog 6008)            -^> caso ENERGIA (tecnico da farmacia)
+echo  23 - Encher o C: ate sobrar 4 GB                        -^> caso N1 RESOLVE (pouco espaco)
+echo  24 - REMOVER o arquivo que enche o C:
+echo  Botao Manutencao do banco (1.7.0):
+echo  25 - PREPARAR: LIMPA os logs Sistema/Aplicativo (tira os erros de disco), tabela quebrada no .err + my.ini com doublewrite=OFF/flush=2
+echo  27 - MOSTRAR o estado: my.ini (port, force, doublewrite, flush), backups e servico
+echo  26 - LIMPAR TUDO do teste do botao (my.ini, .err, servico rodando)
+echo   N - OS 8 CASOS DO N1 EM SEQUENCIA (limpa os logs, usa --dias 7, confere QUEM ACIONAR, restaura)
 echo   T - TODOS DE UMA VEZ: 14, 15, 16, 18, 6, 10, 12, coleta, mostra tudo e restaura (11, 9, 19, 17)
 echo  Coleta e limpeza:
 echo   C - Rodar o DiagBIG (sem janela) e mostrar N1, ONDE ESTA O PROBLEMA, relogio, unidade
@@ -55,9 +65,24 @@ if /i "%op%"=="C" goto coletar
 if /i "%op%"=="G" goto janela
 if /i "%op%"=="L" goto limpar
 if /i "%op%"=="T" goto todos
+if /i "%op%"=="N" goto casos
+if "%op%"=="25" goto preparabotao
 echo opcao %op% >> "%LOG%"
 %PS% -Cenario %op% >> "%LOG%" 2>&1
 echo (erro level %errorlevel%) >> "%LOG%"
+powershell -NoProfile -Command "Get-Content '%LOG%' -Tail 8"
+goto menu
+
+:preparabotao
+echo.
+echo Para o caso 2 (so tabelas) nao pode haver evento de disco/NTFS no periodo. Isto APAGA os logs Sistema e Aplicativo desta VM (so em VM de teste).
+set /p ok=Digite SIM para limpar os logs e preparar: 
+if /i not "%ok%"=="SIM" goto menu
+wevtutil cl System
+wevtutil cl Application
+echo Logs Sistema e Aplicativo limpos (opcao 25). >> "%LOG%"
+echo opcao 25 >> "%LOG%"
+%PS% -Cenario 25 >> "%LOG%" 2>&1
 powershell -NoProfile -Command "Get-Content '%LOG%' -Tail 8"
 goto menu
 
@@ -86,6 +111,17 @@ goto menu
 if exist "%~dp0..\DiagBIG_relatorios\%REL%" (set RP=%~dp0..\DiagBIG_relatorios\%REL%) else (set RP=%~dp0DiagBIG_relatorios\%REL%)
 echo Relatorio: %RP%
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0mostrar.ps1" -Arquivo "%RP%"
+goto menu
+
+:casos
+if not exist "%DIAG%" (echo DiagBIG.exe nao encontrado. & goto menu)
+echo Isto APAGA os logs Sistema e Aplicativo desta VM (so em VM de teste), mexe no .err, no relogio e no espaco do C:, e restaura tudo no fim.
+set /p ok=Digite SIM para continuar: 
+if /i not "%ok%"=="SIM" goto menu
+echo ==== 8 CASOS DO N1 ==== >> "%LOG%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0casos.ps1" -Diag "%DIAG%" -Pasta "%~dp0"
+echo.
+echo Resultado salvo em %~dp0casos-resultado.txt (copie para o compartilhado).
 goto menu
 
 :todos

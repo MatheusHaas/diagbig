@@ -22,7 +22,37 @@ namespace DiagBIG.Core
             return string.Equals(Grouping.ShortSource(o.Source), source, StringComparison.OrdinalIgnoreCase) && o.EventId == id;
         }
 
+        /// <summary>
+        /// Roteiro do N2 para o caso "só tabelas" (sem numeração; quem chama numera). Banco sobe só com force 1 ou 2, sempre na porta 3307
+        /// (o sistema do cliente não conecta), OPTIMIZE/ALTER só nas tabelas listadas e, depois, sem force ainda na 3307. Sem dump pelo N2.
+        /// </summary>
+        public static List<string> TableRoute(IList<string> tables)
+        {
+            var r = new List<string>();
+            r.Add("CONFIRMAR QUE É SÓ TABELA: no .err mais recente só aparecem tabelas com \"corrupt\"/\"marked as crashed\"/reparo solicitado, sem erro de página do ibdata1, redo log (ib_logfile) ou memória do InnoDB; rodar chkdsk /scan na unidade do banco e ver se saiu limpo. Em banco grande NÃO usar mysqlcheck na base inteira (demora): ler o .err.");
+            r.Add("Parar o serviço do MariaDB e, no my.ini [mysqld]: innodb_force_recovery=1 ou 2 (começar no 1; se não subir, 2; NUNCA 3 ou mais), port=3307 (o sistema do cliente não conecta; manutenção), innodb_doublewrite=ON (se estiver OFF, tirar a linha) e innodb_flush_log_at_trx_commit=1 (se estiver 2 ou 0). Anotar os valores de antes. Subir o serviço.");
+            r.Add("Observar a subida: se o serviço sobe, opera alguns segundos e cai de novo (loop de subir e cair) com force 1 e 2, ou só sobe com force 3 ou mais, NÃO é só tabela: parar e acionar a EQUIPE TÉCNICA.");
+            r.Add("Subiu: ler o .err recente E o novo que a subida gerou e listar as tabelas com \"corrupt\"/\"marked as crashed\"/reparo solicitado" + (tables != null && tables.Count > 0 ? " (já identificadas acima: " + tables.Count + ")" : "") + ". Se aparecer erro de página/ibdata1/redo log ou de memória, não é só tabela: EQUIPE TÉCNICA.");
+            r.Add("Ainda com force e na 3307, SÓ nas tabelas listadas: OPTIMIZE TABLE <tabela>; ou ALTER TABLE <tabela> ENGINE=InnoDB; (uma por vez; o force deixa o banco só para reparo). Conferir no .err que o erro não se repete.");
+            r.Add("Reparou: parar o serviço, TIRAR o innodb_force_recovery do my.ini, manter a porta 3307 e subir. Deixar alguns minutos observando o .err: se opera normal, siga; se cair ou entrar em loop, EQUIPE TÉCNICA (não insistir).");
+            r.Add("Operou normal sem force: voltar a porta para 3306, reiniciar o serviço e rodar, nesta ordem, bigupdate.exe (confere MD5 dos arquivos da base atualizador), acertaestrutura.exe (compara com campos.txt e ajusta tabelas) e acertasequenciador.exe (ajusta a sequência dos índices). Só com o banco SEM force e sem OPTIMIZE pendente.");
+            r.Add("Qualquer passo que falhar, o banco não subir sem force ou a corrupção voltar: EQUIPE TÉCNICA (dump, reinstalação ou troca de servidor).");
+            return r;
+        }
+
+        public static string DisabledServiceText(IEnumerable<string> names)
+        {
+            return "SERVIÇO DO BANCO DESATIVADO (" + string.Join(", ", names.ToArray()) + "): confirmar se não consta troca de servidor recente (pode ser um serviço antigo que ficou) e NÃO ativar.";
+        }
+
         public static List<string> Build(ReportData d, List<string> n1 = null)
+        {
+            var plan = BuildCore(d, n1);
+            if (n1 != null && d.DisabledDbServices.Count > 0) n1.Add("ATENÇÃO " + DisabledServiceText(d.DisabledDbServices));
+            return plan;
+        }
+
+        static List<string> BuildCore(ReportData d, List<string> n1)
         {
             var plan = new List<string>();
             var disk = Occ(d, BlockTag.Disk).ToList();
@@ -92,13 +122,21 @@ namespace DiagBIG.Core
             string clockLine = clockBad
                 ? "ATENÇÃO DATA/HORA: o Windows teve a data/hora alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ": provável bateria da placa-mãe (CR2032) fraca ou data errada na BIOS. Com a data errada o banco não sobe. Orientar o técnico da farmácia a conferir data/hora (Windows e BIOS) e, se voltar a errar, a trocar a bateria, ANTES de reparar o banco."
                 : "Orientar o técnico da farmácia a conferir também a data/hora do Windows e a bateria da placa-mãe (CR2032): com a data errada o banco não sobe.";
-            bool onlyClock = clockBad && !(fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0);
-            bool anyProblem = fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0 || clockBad;
+            var lowDrives = Hypotheses.LowSpaceDrives(d);
+            bool lowSpace = lowDrives.Count > 0;
+            string lowText = string.Join(" e ", lowDrives.ToArray());
+            bool noOther = !(fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0);
+            bool onlyN1 = (clockBad || lowSpace) && noOther;
+            bool onlyPower = unexpected > 0 && !(fatalDisk || repairFailed || dbDamaged || ramSuspect || driverBsod || disk.Count > 0);
+            bool anyProblem = fatalDisk || repairFailed || dbDamaged || unexpected > 0 || ramSuspect || driverBsod || disk.Count > 0 || clockBad || lowSpace;
+            d.N1Kind = N1Case.Nada;
+            d.N1Dest = null;
             if (!anyProblem)
             {
                 if (n1 != null) n1.Add("Nenhum indício forte nos logs lidos. Sem encaminhamento para o N2 por este relatório.");
                 return plan;
             }
+            string after = Config.N2AfterHoursNote;
 
             if (n1 != null)
             {
@@ -115,36 +153,58 @@ namespace DiagBIG.Core
                 if (recentDamaged && disk.Count > 0) why.Add("banco recém-instalado já corrompendo, com eventos de disco");
                 if (fatalDisk)
                 {
+                    d.N1Kind = N1Case.TrocarDisco; d.N1Dest = "EQUIPE TÉCNICA";
                     n1.Add("AÇÃO: Acione a equipe técnica para TROCAR O SERVIDOR/DISCO e reinstalar. Não reinstalar neste disco.");
                     n1.Add("Motivo: " + (why.Count > 0 ? string.Join("; ", why.ToArray()) : "erros de disco repetidos") + ".");
                 }
                 else if (dbDamaged && tabOnly && !ramSuspect)
                 {
+                    d.N1Kind = N1Case.Tabelas; d.N1Dest = "N2 SISTEMA";
                     var tabs = Diagnosis.DamagedTables(dbAll);
                     n1.Add("AÇÃO: Acione o N2 para tratar as tabelas:");
                     foreach (string t in tabs.Take(15)) n1.Add("- " + t);
                     if (tabs.Count > 15) n1.Add("... e mais " + (tabs.Count - 15));
                     n1.Add("Em caso de não sucesso, acionar equipe técnica.");
                     n1.Add("Motivo: dano só em tabela(s) e nenhum erro de disco/RAM nos logs.");
+                    if (after.Length > 0) n1.Add(after);
                     if (powerLine != null) n1.Add(powerLine);
                     if (clockBad) n1.Add(clockLine);
                 }
                 else if (dbDamaged)
                 {
+                    d.N1Kind = N1Case.Reinstalar; d.N1Dest = "EQUIPE TÉCNICA";
                     n1.Add("AÇÃO: Acione a equipe técnica para REINSTALAR NO MESMO TERMINAL.");
                     n1.Add("Motivo: dano além de tabelas (arquivos de sistema do banco, banco que não sobe ou erro de memória do banco), sem defeito de disco nos logs." +
                            (ramSuspect ? " HÁ SINAL DE RAM: testar a RAM antes." : ""));
                     if (powerLine != null) n1.Add(powerLine);
                     n1.Add(clockLine);
                 }
-                else if (onlyClock)
+                else if (onlyN1)
                 {
-                    n1.Add("AÇÃO: Orientar o técnico da farmácia a acertar a data/hora do Windows e da BIOS e, se voltar a errar, a trocar a bateria da placa-mãe (CR2032). Não é caso de N2 nem de equipe técnica.");
-                    n1.Add("Motivo: data/hora do Windows alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + "; com a data errada o banco não sobe. Sem dano de banco nem de disco nos logs.");
+                    d.N1Kind = N1Case.N1Sozinho; d.N1Dest = "N1 (RESOLVE SOZINHO)";
+                    if (lowSpace)
+                    {
+                        n1.Add("AÇÃO: O N1 resolve: liberar espaço em " + lowText + " (esvaziar lixeira e pasta Temp, apagar dumps e backups antigos, Limpeza de Disco). Não é caso de N2 nem de equipe técnica.");
+                        n1.Add("Motivo: pouco espaço livre em " + lowText + "; sem espaço o banco para de gravar e pode corromper. Sem dano de banco nem de disco nos logs.");
+                    }
+                    if (clockBad)
+                    {
+                        n1.Add((lowSpace ? "TAMBÉM: " : "AÇÃO: ") + "O N1 resolve: acertar a data/hora do Windows (e conferir a da BIOS). Se voltar a errar, chamar o técnico da farmácia para trocar a bateria da placa-mãe (CR2032).");
+                        n1.Add("Motivo: data/hora do Windows alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + "; com a data errada o banco não sobe. Sem dano de banco nem de disco nos logs.");
+                    }
                     if (powerLine != null) n1.Add(powerLine);
+                }
+                else if (onlyPower)
+                {
+                    d.N1Kind = N1Case.Energia; d.N1Dest = "TÉCNICO DA FARMÁCIA";
+                    n1.Add("AÇÃO: Acione o técnico da farmácia para verificar a energia: no-break (nobreak), fonte, tomada e a bateria da placa-mãe (CR2032).");
+                    n1.Add("Motivo: " + unexpected + " desligamento(s) inesperado(s) sem tela azul de driver nem erro de disco/banco nos logs.");
+                    if (powerLine != null) n1.Add(powerLine);
+                    n1.Add(clockLine);
                 }
                 else
                 {
+                    d.N1Kind = N1Case.ReparoWindows; d.N1Dest = "N2 SISTEMA";
                     n1.Add("AÇÃO: Acione o N2 para reparo simples do Windows (DISM e SFC). Sem dano de banco nem de disco grave nos logs.");
                     var mot = new List<string>();
                     if (unexpected > 0) mot.Add(unexpected + " desligamento(s) inesperado(s)");
@@ -152,6 +212,7 @@ namespace DiagBIG.Core
                     if (driverBsod) mot.Add("tela azul de driver");
                     if (mot.Count == 0) mot.Add("eventos de disco/Windows");
                     n1.Add("Motivo: " + string.Join("; ", mot.ToArray()) + ".");
+                    if (after.Length > 0) n1.Add(after);
                     if (powerLine != null) n1.Add(powerLine);
                     n1.Add(clockLine);
                 }
@@ -179,6 +240,22 @@ namespace DiagBIG.Core
                   "Se não subir, acionar a equipe técnica."
                 : "SALVAR OS DADOS ANTES DE MEXER: dump do banco (mysqldump) e cópia da pasta data e dos arquivos do sistema do cliente para OUTRO disco/máquina; conferir que abre.";
 
+            if (onlyN1 || onlyPower)
+            {
+                plan.Add(onlyN1
+                    ? "VEREDITO: sem dano de banco nem defeito de disco nos logs; é ajuste simples, que o N1 resolve."
+                    : "VEREDITO: sem dano de banco nem defeito de disco nos logs; o que aparece é queda de energia: caso do técnico da farmácia.");
+                if (lowSpace)
+                    plan.Add(step("Liberar espaço em " + lowText + ": esvaziar a lixeira e a pasta Temp, apagar dumps e backups antigos de dentro do servidor (levar para outro disco), Limpeza de Disco. Manter pelo menos 15% livre."));
+                if (clockBad)
+                    plan.Add(step("Data/hora: o Windows teve a data alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ". Acertar data/hora (Windows e BIOS); se voltar a errar, chamar o técnico da farmácia para trocar a bateria da placa-mãe (CR2032) antes de subir o banco; com a data errada ele não sobe."));
+                if (unexpected > 0)
+                    plan.Add(step("Energia: " + unexpected + " desligamento(s) inesperado(s). Técnico da farmácia: conferir no-break (bateria boa), fonte, tomada/aterramento e a bateria da placa-mãe (CR2032); queda de energia corrompe banco."));
+                plan.Add(step("my.ini: innodb_doublewrite DEVE ficar ON (padrão; tirar a linha OFF) e innodb_flush_log_at_trx_commit=1" + (hoje.Count > 0 ? ". Situação hoje: " + string.Join("; ", hoje.ToArray()) : "") +
+                              ". Ajustar e REINICIAR o serviço do MariaDB. Ver os AVISOS da seção do banco."));
+                return plan;
+            }
+
             if (fatalDisk)
             {
                 plan.Add("VEREDITO: DISCO COM DEFEITO GRAVE (" + string.Join("; ", ev.ToArray()) + "). NÃO reinstalar nem restaurar neste disco/servidor: TROCAR o disco (ou o servidor).");
@@ -193,6 +270,20 @@ namespace DiagBIG.Core
             }
             else
             {
+                DiagItem tabItem0 = d.Diagnosis.FirstOrDefault(i => i.Area.StartsWith("TABELA")), sysItem0 = d.Diagnosis.FirstOrDefault(i => i.Area.StartsWith("ARQUIVOS")),
+                         motItem0 = d.Diagnosis.FirstOrDefault(i => i.Area.StartsWith("MOTOR"));
+                bool tablesRoute = dbDamaged && !ramSuspect && tabItem0 != null && tabItem0.Verdict == DiagVerdict.Provavel &&
+                                   (sysItem0 == null || sysItem0.Verdict != DiagVerdict.Provavel) && (motItem0 == null || motItem0.Verdict != DiagVerdict.Provavel);
+                if (tablesRoute)
+                {
+                    plan.Add("VEREDITO: dano só em tabela(s) e sem defeito de disco nem de RAM nos logs. Caso do N2: reparar com force 1 ou 2 na porta 3307, sem dump e sem reinstalar (se algo fugir disso, EQUIPE TÉCNICA).");
+                    foreach (string t in TableRoute(Diagnosis.DamagedTables(dbAll))) plan.Add(step(t));
+                    if (clockBad)
+                        plan.Add(step("Data/hora: o Windows teve a data alterada em mais de 1 dia " + clockEv.Count + "x" + clockWhen + ". Acertar data/hora (Windows e BIOS) e, se voltar a errar, trocar a bateria da placa-mãe (CR2032); com a data errada o banco não sobe."));
+                    if (unexpected > 0)
+                        plan.Add(step("Energia: " + unexpected + " desligamento(s) inesperado(s). Usar no-break (nobreak) com bateria boa no servidor; queda de energia corrompe banco."));
+                    return plan;
+                }
                 plan.Add("VEREDITO: sem defeito grave de disco nos logs. Dá para tentar reparar antes de reinstalar, nesta ordem (parar quando o problema sumir).");
                 plan.Add(step(save));
                 DiagItem tabItem = d.Diagnosis.FirstOrDefault(i => i.Area.StartsWith("TABELA")), sysItem = d.Diagnosis.FirstOrDefault(i => i.Area.StartsWith("ARQUIVOS")),

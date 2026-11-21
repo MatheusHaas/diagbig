@@ -37,6 +37,13 @@ namespace DiagBIG
                 try { r = Collector.Run(days, null); }
                 catch (Exception ex) { Print("DiagBIG: erro na coleta: " + ex); return 1; }
                 Print(r.SavedPath != null ? "DiagBIG: TXT gerado em " + r.SavedPath : "DiagBIG: " + r.SaveError);
+                // Só no modo sem janela (testes): grava ao lado do TXT o texto da tela inicial, para o simulador conferir.
+                try
+                {
+                    if (r.SavedPath != null && r.EssentialText != null)
+                        System.IO.File.WriteAllText(System.IO.Path.ChangeExtension(r.SavedPath, ".essencial"), r.EssentialText, new System.Text.UTF8Encoding(true));
+                }
+                catch (Exception) { }
                 return r.SavedPath != null ? 0 : 1;
             }
 

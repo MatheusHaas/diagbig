@@ -5,7 +5,7 @@ namespace DiagBIG.Core
     /// </summary>
     public static class Config
     {
-        public const string Version = "1.6.8";
+        public const string Version = "1.7.0";
 
         // ---------------- Período ----------------
         public static readonly int[] PeriodOptions = { 7, 30, 90 };
@@ -133,6 +133,12 @@ namespace DiagBIG.Core
         /// <summary>Máximo de horários listados por tipo de ocorrência repetida (os mais recentes).</summary>
         public const int MaxTimesPerGroup = 12;
         public const int ResumoMaxChars = 3500;
+
+        /// <summary>
+        /// Aviso nos casos em que o N2 de sistema é acionado (tabelas e reparo do Windows).
+        /// Pode ser removido: deixar vazio ("") e a linha some do relatório e da tela.
+        /// </summary>
+        public const string N2AfterHoursNote = "Após as 20:00: acionar a EQUIPE TÉCNICA em vez do N2.";
         public const int MaxEventsPerQuery = 20000;
         /// <summary>Pasta (ao lado do .exe ou na Área de Trabalho) onde os TXT são gravados.</summary>
         public const string ReportsFolder = "DiagBIG_relatorios";

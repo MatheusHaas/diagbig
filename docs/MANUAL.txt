@@ -20,11 +20,15 @@ COMO USAR (PASSO A PASSO)
   1. Copie o DiagBIG.exe para o PC do cliente (qualquer pasta).
   2. Dê dois cliques. O Windows pede permissão de administrador: clique em Sim.
   3. A coleta começa sozinha ("Coletando, aguarde..."). Leva poucos segundos.
-  4. Leia o RESUMO, no começo do texto.
+  4. Leia a tela que abre: ela mostra só o essencial (1.7.0). Veja QUEM
+     ACIONAR e o PARA O N1, e repasse.
   5. Clique em:
-       - "Copiar resumo" para colar no comentário do caso (até 3.500 caracteres);
+       - "Copiar tela" para colar o essencial no caso (é o que está na tela);
+       - "Copiar resumo" para colar o resumo no comentário (até 3.500 caracteres);
        - "Copiar tudo" para mandar o relatório completo ao N2.
      Aparece "Copiado!" quando der certo.
+  6. O botão "Mostrar relatório completo" troca a tela pelo relatório inteiro
+     (e volta com "Mostrar só o essencial"). O TXT salvo é sempre o completo.
 
 Para olhar outro período, escolha 7, 30 ou 90 dias e clique em
 "Coletar novamente". O padrão é 30 dias.
@@ -250,6 +254,39 @@ Botões:
   Abrir TXT    abre o relatório no Bloco de Notas.
   Abrir pasta  abre a pasta com o relatório selecionado.
 
+
+TELA ESSENCIAL (QUEM ACIONAR)
+-----------------------------
+Ao abrir, a tela mostra só o necessário para decidir e repassar: QUEM ACIONAR,
+PARA O N1, identificação (PC, IP, Windows), sistema operacional, unidades e um
+bloco curto do caso. Os 8 casos:
+  1. Nada encontrado ............ sem encaminhamento.
+  2. Só tabelas danificadas ..... N2 SISTEMA, sem dump e sem reinstalar:
+     confirmar no .err (só tabela, sem erro de página/ibdata1/redo log) e
+     chkdsk /scan; my.ini com innodb_force_recovery=1 ou 2 (nunca 3+), porta
+     3307, doublewrite=ON e flush=1; se o serviço sobe e cai em loop, é equipe
+     técnica; listar as tabelas do .err (recente e o novo da subida);
+     OPTIMIZE/ALTER TABLE ... ENGINE=InnoDB só nelas; tirar o force, subir na
+     3307 e observar; se operar normal, porta 3306 e rodar bigupdate.exe,
+     acertaestrutura.exe e acertasequenciador.exe. Falhou: equipe técnica.
+     O botão "Manutenção do banco (force 3307)" faz os passos do my.ini e da
+     subida: aplica force 1 ou 2, porta 3307, doublewrite ON e flush 1 (guarda
+     o my.ini original e pede confirmação), reinicia o serviço e observa 30
+     segundos (estável, não sobe ou cai em loop), lista as tabelas do .err novo
+     e depois tira o force mantendo a 3307; "Restaurar my.ini original" desfaz.
+     OPTIMIZE/ALTER e os três programas continuam com o N2.
+  3. Disco com defeito .......... EQUIPE TÉCNICA: trocar disco/servidor. Mostra
+     o disco com erro e os reinícios/desligamentos.
+  4. Banco danificado além de tabelas, sem disco ruim ... EQUIPE TÉCNICA:
+     reinstalar no mesmo terminal.
+  5. Reparo do Windows (tela azul de driver, DISM, eventos sem dano no banco)
+     ........................... N2 SISTEMA: DISM e SFC.
+  6. Só queda de energia ........ TÉCNICO DA FARMÁCIA: no-break, fonte, tomada,
+     bateria da placa-mãe.
+  7. Pouco espaço em disco, ou só data/hora errada do Windows ... o próprio N1
+     resolve (liberar espaço; acertar a data/hora e, se voltar a errar, chamar o
+     técnico da farmácia para trocar a bateria CR2032).
+Nos casos 2 e 5 aparece: "Após as 20:00: acionar a EQUIPE TÉCNICA em vez do N2."
 
 SITUAÇÕES COMUNS
 ----------------

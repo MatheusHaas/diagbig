@@ -19,16 +19,20 @@ namespace DiagBIG.UI
         readonly Label status = new Label();
         readonly TextBox output = new TextBox();
         readonly Button copyAll = new Button();
+        readonly Button toggle = new Button();
+        readonly Button copyScreen = new Button();
         readonly Button copySummary = new Button();
         readonly Button openTxt = new Button();
         readonly Button openFolder = new Button();
         readonly Button chkdsk = new Button();
         readonly Button memtest = new Button();
+        readonly Button maint = new Button();
         readonly Label copied = new Label();
         readonly System.Windows.Forms.Timer copiedTimer = new System.Windows.Forms.Timer();
 
         CollectionResult last;
         bool running;
+        bool showFull;
 
         public MainForm(int initialDays)
         {
@@ -73,13 +77,16 @@ namespace DiagBIG.UI
 
             // --- rodapé ---
             var bottom = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false, Padding = new Padding(4) };
-            Setup(copyAll, "Copiar tudo", (s, e) => Copy(last == null ? null : last.FullText));
+            Setup(toggle, "Mostrar relatório completo", (s, e) => { showFull = !showFull; ShowText(); });
+            Setup(copyScreen, "Copiar tela", (s, e) => Copy(output.Text));
             Setup(copySummary, "Copiar resumo", (s, e) => Copy(last == null ? null : last.ResumoText));
+            Setup(copyAll, "Copiar tudo", (s, e) => Copy(last == null ? null : last.FullText));
             Setup(openTxt, "Abrir TXT", (s, e) => OpenTxt());
             Setup(openFolder, "Abrir pasta", (s, e) => OpenFolder());
             Setup(chkdsk, "Verificar disco (chkdsk /scan)", (s, e) => RunChkdsk());
             Setup(memtest, "Testar memória (mdsched)", (s, e) => RunMemTest());
-            bottom.Controls.AddRange(new Control[] { copyAll, copySummary, openTxt, openFolder, chkdsk, memtest });
+            Setup(maint, "Manutenção do banco (force 3307)", (s, e) => RunMaintenance());
+            bottom.Controls.AddRange(new Control[] { toggle, copyScreen, copySummary, copyAll, openTxt, openFolder, chkdsk, memtest, maint });
             copied.Text = "Copiado!";
             copied.AutoSize = true;
             copied.ForeColor = Color.DarkGreen;
@@ -136,8 +143,8 @@ namespace DiagBIG.UI
         void SetBusy(bool busy)
         {
             running = busy;
-            collect.Enabled = period.Enabled = chkdsk.Enabled = memtest.Enabled = !busy;
-            copyAll.Enabled = copySummary.Enabled = !busy && last != null;
+            collect.Enabled = period.Enabled = chkdsk.Enabled = memtest.Enabled = maint.Enabled = !busy;
+            copyAll.Enabled = copySummary.Enabled = copyScreen.Enabled = toggle.Enabled = !busy && last != null;
             openTxt.Enabled = openFolder.Enabled = !busy && last != null && last.SavedPath != null;
             UseWaitCursor = busy;
         }
@@ -183,12 +190,21 @@ namespace DiagBIG.UI
                 return;
             }
             last = r;
-            output.Text = r.FullText;
+            showFull = false;
+            ShowText();
+            status.Text = r.SavedPath != null ? "Pronto. TXT salvo em " + r.SavedPath : "Pronto, mas " + r.SaveError;
+            SetBusy(false);
+        }
+
+        /// <summary>Mostra o essencial (padrão) ou o relatório completo; o TXT salvo é sempre o completo.</summary>
+        void ShowText()
+        {
+            if (last == null) return;
+            output.Text = showFull ? last.FullText : (last.EssentialText ?? last.FullText);
             output.SelectionStart = 0;
             output.SelectionLength = 0;
             output.ScrollToCaret();
-            status.Text = r.SavedPath != null ? "Pronto. TXT salvo em " + r.SavedPath : "Pronto, mas " + r.SaveError;
-            SetBusy(false);
+            toggle.Text = showFull ? "Mostrar só o essencial" : "Mostrar relatório completo";
         }
 
         void Copy(string text)
@@ -228,6 +244,19 @@ namespace DiagBIG.UI
             try { dir = last != null && last.SavedPath != null ? Path.GetDirectoryName(last.SavedPath) : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory); }
             catch (Exception) { dir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory); }
             using (var f = new ChkdskForm(Icon, dir, last != null && last.Data != null ? last.Data.ComputerName : SystemInfo.HostName())) f.ShowDialog(this);
+        }
+
+        void RunMaintenance()
+        {
+            if (running) return;
+            bool fatal = last != null && last.Data != null && last.Data.ActionPlan.Count > 0 && last.Data.ActionPlan[0].StartsWith("VEREDITO: DISCO COM DEFEITO GRAVE", StringComparison.Ordinal);
+            if (MessageBox.Show(this,
+                    (fatal ? "ATENÇÃO: o relatório indica DISCO COM DEFEITO GRAVE. Não é caso de reparo de tabela: é caso de trocar o disco (equipe técnica).\r\n\r\n" : "") +
+                    "Este assistente é para o caso SÓ TABELAS (N2): ele ajusta o my.ini (force 1 ou 2, porta 3307, doublewrite ON, flush 1), reinicia o serviço do banco e observa a subida por 30 segundos.\r\n\r\n" +
+                    "O sistema do cliente deixa de conectar enquanto estiver na porta 3307. O my.ini original é guardado e dá para restaurar. Abrir?", "DiagBIG",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            using (var f = new MaintenanceForm(Icon)) f.ShowDialog(this);
         }
 
         void RunMemTest()
