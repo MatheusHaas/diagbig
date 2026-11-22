@@ -70,8 +70,8 @@ namespace DiagBIG.UI
             // --- texto ---
             output.Multiline = true;
             output.ReadOnly = true;
-            output.ScrollBars = ScrollBars.Both;
-            output.WordWrap = false;
+            output.ScrollBars = ScrollBars.Vertical;
+            output.WordWrap = true;
             output.MaxLength = 0;
             output.Dock = DockStyle.Fill;
             output.Font = new Font("Consolas", 9.5F);
@@ -88,7 +88,7 @@ namespace DiagBIG.UI
             Setup(openFolder, "Abrir pasta", (s, e) => OpenFolder());
             chkdsk.Text = "Verificar disco (chkdsk /scan)"; chkdsk.Click += (s, e) => RunChkdsk();
             memtest.Text = "Testar memória (mdsched)"; memtest.Click += (s, e) => RunMemTest();
-            maint.Text = "Manutenção do banco (force 3307)"; maint.Click += (s, e) => RunMaintenance();
+            maint.Text = "Manutenção do banco (force em porta de manutenção)"; maint.Click += (s, e) => RunMaintenance();
             wmi.Text = "Reparar WMI (repositório)"; wmi.Click += (s, e) => RunWmi();
             toolsMenu.Items.AddRange(new ToolStripItem[] { chkdsk, memtest });
 #if FORCE_MAINT
@@ -262,8 +262,9 @@ namespace DiagBIG.UI
             bool fatal = last != null && last.Data != null && last.Data.ActionPlan.Count > 0 && last.Data.ActionPlan[0].StartsWith("VEREDITO: DISCO COM DEFEITO GRAVE", StringComparison.Ordinal);
             if (MessageBox.Show(this,
                     (fatal ? "ATENÇÃO: o relatório indica DISCO COM DEFEITO GRAVE. Não é caso de reparo de tabela: é caso de trocar o disco (equipe técnica).\r\n\r\n" : "") +
-                    "Este assistente é para o caso SÓ TABELAS (N2): ele ajusta o my.ini (force 1 ou 2, porta 3307, doublewrite ON, flush 1), reinicia o serviço do banco e observa a subida por 30 segundos.\r\n\r\n" +
-                    "O sistema do cliente deixa de conectar enquanto estiver na porta 3307. O my.ini original é guardado e dá para restaurar. Abrir?", "DiagBIG",
+                    "Este assistente é para o caso SÓ TABELAS (N2): ele ajusta o my.ini (force 1 ou 2, porta de manutenção, doublewrite ON, flush 1), reinicia o serviço do banco e observa a subida por 30 segundos.\r\n\r\n" +
+                    "A porta de manutenção é a 3307; se o cliente já usa a 3307 (ou ela está ocupada), o assistente usa a próxima livre. O sistema do cliente deixa de conectar enquanto o banco estiver nela. " +
+                    "O my.ini original é guardado e dá para restaurar. Aplicar o force pede duas confirmações. Abrir?", "DiagBIG",
                     MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
             using (var f = new MaintenanceForm(Icon)) f.ShowDialog(this);

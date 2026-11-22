@@ -117,7 +117,7 @@ namespace DiagBIG.Tests
             Assert.Equal("N2 SISTEMA", d.N1Dest);
             string t = ReportBuilder.BuildEssential(d);
             Assert.Contains("Após as 20:00", t);
-            Assert.Contains("sfc /scannow", t);
+            Assert.Contains("sfc /scannow", System.Text.RegularExpressions.Regex.Replace(t, @"\s+", " ")); // o texto pode quebrar linha no meio
         }
 
         [Fact]

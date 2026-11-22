@@ -123,9 +123,13 @@ function Ini-Restaurar {
 function Relogio-Saltar {
     Write-Host "Voltando o relogio 3 dias e corrigindo em seguida..."
     try { Stop-Service -Name w32time -Force -ErrorAction SilentlyContinue } catch { }
-    Set-Date -Adjust (New-TimeSpan -Days -3) | Out-Null
+    # Referencia absoluta: o Guest Additions do VirtualBox pode sincronizar o relogio com o host durante a espera,
+    # entao somar +3 dias ao final empurrava a data 3 dias PARA A FRENTE (a coleta rodava com a data errada).
+    $t0 = Get-Date
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    Set-Date -Date $t0.AddDays(-3) | Out-Null
     Start-Sleep -Seconds 3
-    Set-Date -Adjust (New-TimeSpan -Days 3 -Seconds 3) | Out-Null
+    Set-Date -Date $t0.AddSeconds($sw.Elapsed.TotalSeconds) | Out-Null
     try { Start-Service -Name w32time -ErrorAction SilentlyContinue } catch { }
     Write-Host ("Relogio de volta: " + (Get-Date))
 }
@@ -227,6 +231,49 @@ function Botao-Preparar {
     Write-Host "Pronto. Agora: DiagBIG.exe (opcao G) > 'Manutencao do banco (force 3307)' > botao 1; depois a opcao 27 mostra o estado." -ForegroundColor Green
 }
 
+# ---- Regra da porta de manutencao do botao (3307 ou a proxima livre) ----
+# 33: poe o cliente na porta 3306 no my.ini (guarda copia em .bak-porta-diagbig) e reinicia o servico.
+function Porta-Cliente3306 {
+    $f = Achar-Ini
+    if (-not $f) { Write-Host "NAO ACHEI o my.ini." -ForegroundColor Red; return }
+    Com-Servico {
+        $bak = $f + ".bak-porta-diagbig"
+        if (-not (Test-Path $bak)) { Copy-Item $f $bak -Force; Write-Host "Copia de seguranca: $bak" }
+        $linhas = @(Get-Content -Path $f -Encoding Default | ForEach-Object { if ($_ -match '^\s*port\s*=') { 'port=3306' } else { $_ } })
+        Set-Content -Path $f -Value $linhas -Encoding Default
+        Write-Host "my.ini: port=3306 nas duas secoes (cliente na 3306)."
+    }
+}
+# 34: volta o my.ini que o 33 guardou.
+function Porta-Cliente-Restaurar {
+    $f = Achar-Ini
+    if ($f -and (Test-Path ($f + ".bak-porta-diagbig"))) {
+        Com-Servico { Copy-Item ($f + ".bak-porta-diagbig") $f -Force; Remove-Item ($f + ".bak-porta-diagbig"); Write-Host "Restaurado: $f" }
+    } else { Write-Host "Nada para restaurar." }
+}
+$PortaPidArq = Join-Path $env:TEMP "diagbig-listener.pid"
+# 32: encerra os listeners do 31.
+function Porta-Liberar {
+    if (Test-Path $PortaPidArq) {
+        $id = [int](Get-Content $PortaPidArq)
+        try { Stop-Process -Id $id -Force -ErrorAction Stop; Write-Host "Listeners encerrados (PID $id)." } catch { Write-Host "Os listeners ja tinham terminado." }
+        Remove-Item $PortaPidArq -Force
+    } else { Write-Host "Nenhum listener do simulador ativo." }
+}
+# 31: ocupa as portas 3307 e 3308 com um programa qualquer (listeners em segundo plano). Se o banco ja escuta numa delas, essa nao e ocupada.
+function Porta-Ocupar {
+    Porta-Liberar
+    # Socket dual-stack em [::] (igual ao mysqld): um TcpListener em 0.0.0.0 (so IPv4) NAO impede o MariaDB de subir na mesma porta.
+    $cmd = '$l = @(); foreach ($p in 3307,3308) { try { $k = New-Object Net.Sockets.Socket([Net.Sockets.AddressFamily]::InterNetworkV6, [Net.Sockets.SocketType]::Stream, [Net.Sockets.ProtocolType]::Tcp); $k.DualMode = $true; $k.ExclusiveAddressUse = $true; $k.Bind((New-Object Net.IPEndPoint([Net.IPAddress]::IPv6Any, $p))); $k.Listen(10); $l += $k } catch { } }; Start-Sleep -Seconds 7200'
+    $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($cmd))
+    $proc = Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile', '-EncodedCommand', $enc -PassThru
+    Set-Content -Path $PortaPidArq -Value $proc.Id
+    Start-Sleep -Seconds 3
+    $ouvindo = @(Get-NetTCPConnection -State Listen -LocalPort 3307, 3308 -ErrorAction SilentlyContinue | ForEach-Object { "$($_.LocalPort) (PID $($_.OwningProcess))" })
+    Write-Host ("Portas 3307/3308 em escuta agora: " + $(if ($ouvindo.Count -gt 0) { $ouvindo -join ", " } else { "nenhuma" }))
+    Write-Host "Com o cliente na 3306 (opcao 33), o botao deve escolher a 3309. Para liberar: opcao 32."
+}
+
 # 27: mostra o estado do my.ini (linhas que o botao mexe, comentarios DiagBIG, arquivos de backup) e do servico.
 function Botao-Estado {
     $f = Achar-Ini
@@ -237,6 +284,9 @@ function Botao-Estado {
         ForEach-Object { Write-Host ("  | " + $_) }
     $svc = Servico-Banco
     if ($svc) { Write-Host ("Servico " + $svc.Name + ": " + (Get-Service -Name $svc.Name).Status) }
+    $ouvindo = @(Get-NetTCPConnection -State Listen -LocalPort (3306..3310) -ErrorAction SilentlyContinue | ForEach-Object { "$($_.LocalPort) (PID $($_.OwningProcess))" })
+    Write-Host ("Portas 3306-3310 em escuta: " + $(if ($ouvindo.Count -gt 0) { $ouvindo -join ", " } else { "nenhuma" }))
+    foreach ($suf in @(".bak-porta-diagbig")) { Write-Host ("  " + $suf + ": " + $(if (Test-Path ($f + $suf)) { "EXISTE" } else { "nao existe" })) }
 }
 
 # 26: desfaz TUDO do teste do botao: my.ini (o guardado pelo botao e depois o do simulador), .err, e deixa o servico rodando.
@@ -249,7 +299,7 @@ function Botao-Limpar {
         try { (Get-Service -Name $svc.Name).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(60)) } catch { }
     }
     if ($f) {
-        foreach ($suf in @(".diagbig-original", ".bak-diagbig")) {
+        foreach ($suf in @(".diagbig-original", ".bak-diagbig", ".bak-porta-diagbig")) {
             if (Test-Path ($f + $suf)) { Copy-Item $f ($f + ".antes-da-limpeza") -Force; Copy-Item ($f + $suf) $f -Force; Remove-Item ($f + $suf); Write-Host "Restaurado de $suf" }
         }
         $sobra = @(Get-Content -Path $f -Encoding Default | Where-Object { $_ -match '^\s*innodb_force_recovery\s*=' -or $_ -match '^\s*port\s*=\s*3307' })
@@ -257,6 +307,7 @@ function Botao-Limpar {
     } else { Write-Host "NAO ACHEI o my.ini." -ForegroundColor Red }
     $e = Achar-Err
     if ($e -and (Test-Path ($e + ".bak-diagbig"))) { Copy-Item ($e + ".bak-diagbig") $e -Force; Remove-Item ($e + ".bak-diagbig"); Write-Host "Restaurado o .err: $e" }
+    Porta-Liberar
     if ($svc) {
         Write-Host "Subindo o servico $($svc.Name) ..."
         Start-Service -Name $svc.Name -ErrorAction SilentlyContinue
@@ -384,5 +435,9 @@ switch ($Cenario) {
  28 { Wmi-Corromper }
  29 { Wmi-Limpar }
  30 { Wmi-Estado }
+ 31 { Porta-Ocupar }
+ 32 { Porta-Liberar }
+ 33 { Porta-Cliente3306 }
+ 34 { Porta-Cliente-Restaurar }
  default { Write-Host "Cenario invalido." }
 }

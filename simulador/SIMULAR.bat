@@ -59,6 +59,11 @@ echo  Botao Reparar WMI (1.7.0):
 echo  28 - ESTRAGAR o repositorio do WMI (guarda copia; nao use outras opcoes ate a 29)
 echo  30 - MOSTRAR: verifyrepository, pastas Repository/OLD_Repository e servico
 echo  29 - LIMPAR o teste do WMI (restaura a copia, apaga OLD_Repository_*, religa o WMI)
+echo  Regra da porta de manutencao do botao (3307 ou a proxima livre):
+echo  33 - CLIENTE NA 3306: troca port= por 3306 no my.ini (guarda copia, reinicia o servico)
+echo  31 - OCUPAR as portas 3307 e 3308 com listeners (cliente na 3306: o botao deve escolher a 3309)
+echo  32 - LIBERAR as portas (encerra os listeners)
+echo  34 - RESTAURAR o my.ini que o 33 guardou (porta do cliente de volta)
 echo   N - OS 8 CASOS DO N1 EM SEQUENCIA (limpa os logs, usa --dias 7, confere QUEM ACIONAR, restaura)
 echo   T - TODOS DE UMA VEZ: 14, 15, 16, 18, 6, 10, 12, coleta, mostra tudo e restaura (11, 9, 19, 17)
 echo  Coleta e limpeza:
@@ -145,7 +150,7 @@ echo Isto APAGA os logs Sistema e Aplicativo desta VM (so em VM de teste), mexe 
 set /p ok=Digite SIM para continuar: 
 if /i not "%ok%"=="SIM" goto menu
 echo ==== 8 CASOS DO N1 ==== >> "%LOG%"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0casos.ps1" -Diag "%DIAG%" -Pasta "%~dp0" -Saida "%OUT%\Simulador_casos-resultado.txt"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0casos.ps1" -Diag "%DIAG%" -Pasta "%~dp0." -Saida "%OUT%\Simulador_casos-resultado.txt"
 echo.
 echo Resultado salvo em %OUT%\Simulador_casos-resultado.txt
 goto menu

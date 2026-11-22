@@ -264,11 +264,13 @@ bloco curto do caso. Os 8 casos:
   2. Só tabelas danificadas ..... N2 SISTEMA, sem dump e sem reinstalar:
      confirmar no .err (só tabela, sem erro de página/ibdata1/redo log) e
      chkdsk /scan; my.ini com innodb_force_recovery=1 ou 2 (nunca 3+), porta
-     3307, doublewrite=ON e flush=1; se o serviço sobe e cai em loop, é equipe
-     técnica; listar as tabelas do .err (recente e o novo da subida);
+     3307 (se o cliente já usa a 3307 ou ela está ocupada, a próxima livre,
+     ex.: 3308), doublewrite=ON e flush=1; se o serviço sobe e cai em loop, é
+     equipe técnica; listar as tabelas do .err (recente e o novo da subida);
      OPTIMIZE/ALTER TABLE ... ENGINE=InnoDB só nelas; tirar o force, subir na
-     3307 e observar; se operar normal, porta 3306 e rodar bigupdate.exe,
-     acertaestrutura.exe e acertasequenciador.exe. Falhou: equipe técnica.
+     porta de manutenção e observar; se operar normal, voltar a porta original
+     do cliente (em geral 3306) e rodar bigupdate.exe, acertaestrutura.exe e
+     acertasequenciador.exe. Falhou: equipe técnica.
      Nesta versão não há botão para o my.ini/force: o N2 faz esses passos à
      mão (um botão de manutenção do banco fica para uma versão futura).
      OPTIMIZE/ALTER e os três programas continuam com o N2.

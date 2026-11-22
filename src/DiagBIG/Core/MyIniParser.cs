@@ -17,6 +17,8 @@ namespace DiagBIG.Core
         public string FlushLogAtTrxCommit { get; set; }
         /// <summary>innodb_force_recovery. null = não definido (padrão 0).</summary>
         public string ForceRecovery { get; set; }
+        /// <summary>port da seção do servidor. null = não definido (padrão 3306).</summary>
+        public string Port { get; set; }
     }
 
     /// <summary>Lê datadir, basedir e log-error do my.ini / my.cnf.</summary>
@@ -55,6 +57,7 @@ namespace DiagBIG.Core
                     case "skip_innodb_doublewrite": opt.DoubleWrite = "OFF"; break;
                     case "innodb_flush_log_at_trx_commit": if (!string.IsNullOrEmpty(value)) opt.FlushLogAtTrxCommit = value; break;
                     case "innodb_force_recovery": if (!string.IsNullOrEmpty(value)) opt.ForceRecovery = value; break;
+                    case "port": if (!string.IsNullOrEmpty(value)) opt.Port = value; break;
                     case "log_error":
                         opt.LogErrorDefined = true;
                         opt.LogError = string.IsNullOrEmpty(value) ? "" : WinPath.Normalize(value);
@@ -77,6 +80,7 @@ namespace DiagBIG.Core
                 if (o.DoubleWrite != null) r.DoubleWrite = o.DoubleWrite;
                 if (o.FlushLogAtTrxCommit != null) r.FlushLogAtTrxCommit = o.FlushLogAtTrxCommit;
                 if (o.ForceRecovery != null) r.ForceRecovery = o.ForceRecovery;
+                if (o.Port != null) r.Port = o.Port;
             }
             return r;
         }

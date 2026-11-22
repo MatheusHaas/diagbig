@@ -104,7 +104,7 @@ namespace DiagBIG.Tests
             Assert.Contains("Log Sistema: log cobre desde 01/11/2026 — AVISO: não cobre o período escolhido", txt);
             Assert.Contains("Log Aplicativo: log cobre desde 01/01/2026\r\n", txt);
             Assert.Contains("AVISO: log de eventos LIMPO em 02/11/2026 08:00", txt);
-            Assert.Contains("BANCO (MariaDB): leitura do .err cobre desde 05/11/2026 (últimos 10,0 MB de 300,0 MB) — AVISO", txt);
+            Assert.Contains("BANCO (MariaDB): leitura do .err cobre desde 05/11/2026 (últimos 10,0 MB de 300,0 MB) — AVISO", System.Text.RegularExpressions.Regex.Replace(txt, @"\s+", " ")); // a linha longa quebra
 
             Assert.Contains("  DISCO: ATENÇÃO — 40 eventos (disk 7: 40x), último em 02/11/2026 15:00", txt);
             Assert.Contains("DESLIGAMENTOS: OK — nenhuma ocorrência no período", txt);

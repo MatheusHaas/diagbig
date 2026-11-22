@@ -311,7 +311,7 @@ namespace DiagBIG.Core
                 sb.Append(extra).Append(NL);
             }
             sb.Append("  Mais detalhes: botão \"Mostrar relatório completo\" ou o TXT salvo.").Append(NL);
-            return sb.ToString();
+            return WrapLong(sb.ToString());
         }
 
         public static string BuildSummary(ReportData d)
@@ -450,6 +450,53 @@ namespace DiagBIG.Core
             if (line.Length > 0) sb.Append(indent).Append(line).Append(NL);
         }
 
+        /// <summary>Largura em que as linhas do relatório são quebradas (telas pequenas, janela do Bloco de Notas sem quebra automática).</summary>
+        public const int WrapWidth = 90;
+
+        static readonly System.Text.RegularExpressions.Regex HangRow =
+            new System.Text.RegularExpressions.Regex(@"^(\s*[^:\r\n]{1,24}?\s\.{2,}: )", System.Text.RegularExpressions.RegexOptions.Compiled);
+        static readonly System.Text.RegularExpressions.Regex HangItem =
+            new System.Text.RegularExpressions.Regex(@"^(\s*(\d+\.|-|\[[^\]\r\n]{1,30}\])\s+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>
+        /// Quebra as linhas maiores que "width" no último espaço que cabe, sem tirar nem juntar nada (os espaços de dentro ficam como estão).
+        /// A continuação sai alinhada: depois de "CHAVE ....: ", depois de "1. " / "- " / "[PROVÁVEL] ", ou no mesmo recuo da linha.
+        /// Linhas sem espaço (caminhos) não são cortadas.
+        /// </summary>
+        public static string WrapLong(string text, int width = WrapWidth)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            string[] lines = text.Split(new[] { "\r\n" }, StringSplitOptions.None);
+            var sb = new StringBuilder(text.Length + 256);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                if (i > 0) sb.Append(NL);
+                if (line.Length <= width) { sb.Append(line); continue; }
+
+                int lead = line.Length - line.TrimStart().Length;
+                var m = HangRow.Match(line);
+                int hang = m.Success ? m.Length : 0;
+                if (hang == 0) { var it = HangItem.Match(line); hang = it.Success ? it.Length : lead; }
+                if (hang > width / 2) hang = lead;           // recuo grande demais deixaria pouco espaço para o texto
+                string pad = new string(' ', hang);
+
+                string rest = line;
+                bool first = true;
+                while (rest.Length > width)
+                {
+                    int cut = rest.LastIndexOf(' ', width - 1);
+                    int minCut = (first ? hang : pad.Length) + 8; // não quebra logo no começo (evita linha só com o rótulo)
+                    if (cut < minCut) { cut = rest.IndexOf(' ', width); if (cut < 0) break; }
+                    sb.Append(rest.Substring(0, cut).TrimEnd()).Append(NL);
+                    rest = pad + rest.Substring(cut).TrimStart();
+                    first = false;
+                }
+                sb.Append(rest);
+            }
+            return sb.ToString();
+        }
+
         static void Title(StringBuilder sb, string title)
         {
             sb.Append(title).Append(NL).Append(new string('-', title.Length)).Append(NL);
@@ -457,13 +504,13 @@ namespace DiagBIG.Core
 
         public static string BuildFull(ReportData d)
         {
-            return BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildActionPlan(d) + BuildHypotheses(d) + BuildSections(d);
+            return WrapLong(BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildActionPlan(d) + BuildHypotheses(d) + BuildSections(d));
         }
 
         /// <summary>Cabeçalho + resumo, cortado em no máximo maxChars (para colar no caso).</summary>
         public static string BuildResumo(ReportData d, int maxChars = Config.ResumoMaxChars)
         {
-            return Truncate((BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildActionPlan(d) + BuildHypotheses(d)).TrimEnd() + NL, maxChars);
+            return Truncate(WrapLong((BuildHeader(d) + BuildSummary(d) + BuildDiagnosis(d) + BuildActionPlan(d) + BuildHypotheses(d)).TrimEnd() + NL), maxChars);
         }
 
         public static string Truncate(string text, int maxChars)

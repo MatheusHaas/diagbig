@@ -14,15 +14,20 @@ using DiagBIG.Windows;
 namespace DiagBIG.UI
 {
     /// <summary>
-    /// Manutenção do banco para o caso "só tabelas": ajusta o my.ini (force 1 ou 2, porta 3307, doublewrite ON, flush 1), reinicia o serviço
-    /// e observa a subida por 30 segundos. NÃO roda OPTIMIZE/ALTER nem os programas do sistema: isso continua com o N2. Cada ação pede confirmação
-    /// e o my.ini original fica guardado em "my.ini.diagbig-original" (botão Restaurar).
+    /// Manutenção do banco para o caso "só tabelas": ajusta o my.ini (force 1 ou 2, porta de manutenção, doublewrite ON, flush 1), reinicia o
+    /// serviço e observa a subida por 30 segundos. NÃO roda OPTIMIZE/ALTER nem os programas do sistema: isso continua com o N2.
+    /// A porta de manutenção é a 3307, ou a próxima livre quando o cliente já usa a 3307 (ver MaintenancePort); se o serviço não sobe por
+    /// porta em uso, tenta a seguinte. Aplicar o force exige DUAS confirmações (a segunda é digitar o nome do PC); o my.ini original fica
+    /// guardado em "my.ini.diagbig-original" (botão Restaurar).
     /// </summary>
     internal class MaintenanceForm : Form
     {
-        const string MaintPort = "3307";
         const int ObserveSeconds = 30;
+        const int MaxPortRetries = 3;
         const string OriginalSuffix = ".diagbig-original";
+
+        // porta do sistema do cliente e porta usada na manutenção (definidas a cada ação, em Run; lidas pelo Report).
+        int clientPort = MaintenancePort.MySqlDefault, maintPort = MaintenancePort.Preferred;
 
         readonly TextBox box = new TextBox();
         readonly ComboBox svcBox = new ComboBox();
@@ -37,7 +42,7 @@ namespace DiagBIG.UI
 
         public MaintenanceForm(Icon icon)
         {
-            Text = "Manutenção do banco: force 1 ou 2 na porta " + MaintPort;
+            Text = "Manutenção do banco: force 1 ou 2 em porta de manutenção (3307 ou a próxima livre)";
             if (icon != null) Icon = icon;
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(900, 620);
@@ -52,12 +57,12 @@ namespace DiagBIG.UI
             forceBox.Items.AddRange(new object[] { "1", "2" }); forceBox.SelectedIndex = 0;
             top.Controls.Add(forceBox);
 
-            box.Multiline = true; box.ReadOnly = true; box.ScrollBars = ScrollBars.Both; box.WordWrap = false;
+            box.Multiline = true; box.ReadOnly = true; box.ScrollBars = ScrollBars.Vertical; box.WordWrap = true;
             box.Dock = DockStyle.Fill; box.Font = new Font("Consolas", 9.5F); box.BackColor = SystemColors.Window;
 
             var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(4) };
             Btn(apply, "1) Aplicar force e testar subida (" + ObserveSeconds + " s)", (s, e) => Go(Mode.Apply));
-            Btn(remove, "2) Tirar o force e testar (porta " + MaintPort + ")", (s, e) => Go(Mode.RemoveForce));
+            Btn(remove, "2) Tirar o force e testar (porta de manutenção)", (s, e) => Go(Mode.RemoveForce));
             Btn(restore, "Restaurar my.ini original", (s, e) => Go(Mode.Restore));
             Btn(copy, "Copiar", (s, e) => { try { Clipboard.SetDataObject(all.ToString(), true, 10, 100); } catch (Exception) { } });
             var close = new Button { Text = "Fechar", AutoSize = true };
@@ -89,7 +94,8 @@ namespace DiagBIG.UI
         void Discover()
         {
             Append("Este assistente SÓ mexe no my.ini e no serviço do banco. OPTIMIZE/ALTER TABLE e os programas (bigupdate, acertaestrutura, acertasequenciador) continuam com o N2.\r\n" +
-                   "Cada ação pede confirmação. O my.ini original fica guardado ao lado dele como \"" + "my.ini" + OriginalSuffix + "\".\r\n\r\n");
+                   "Aplicar o force pede DUAS confirmações (a segunda é digitar o nome do PC). O my.ini original fica guardado ao lado dele como \"" + "my.ini" + OriginalSuffix + "\".\r\n" +
+                   "A porta de manutenção é a " + MaintenancePort.Preferred + "; se o cliente já usa a " + MaintenancePort.Preferred + " (ou ela está ocupada), o assistente sobe para a próxima livre.\r\n\r\n");
             try
             {
                 foreach (DbService svc in DbDiscovery.FindServices())
@@ -156,6 +162,15 @@ namespace DiagBIG.UI
             return r == DialogResult.Yes;
         }
 
+        /// <summary>Segunda confirmação: a pessoa digita o nome do PC (ver ConfirmTypeForm).</summary>
+        bool ConfirmTyped(string text, string word)
+        {
+            bool r = false;
+            try { Invoke(new Action(() => r = ConfirmTypeForm.Ask(this, Icon, "DiagBIG — confirmação 2 de 2", text, word))); }
+            catch (InvalidOperationException) { }
+            return r;
+        }
+
         static string ReadIni(string path, out Encoding enc, out bool bom)
         {
             byte[] b = File.ReadAllBytes(path);
@@ -196,11 +211,37 @@ namespace DiagBIG.UI
             else
             {
                 string cur = ReadIni(ini, out enc, out bom);
+                Encoding origEnc; bool origBom;
+                string orig = File.Exists(original) ? ReadIni(original, out origEnc, out origBom) : null;
+
+                // Porta: a do cliente nunca pode ser a de manutenção (senão o sistema do cliente continua conectando no banco com force).
+                PortPlan plan = MaintenancePort.Plan(cur, orig, ListeningPorts());
+                if (plan.MaintPort == 0)
+                {
+                    Append("Não achei porta livre entre " + MaintenancePort.Preferred + " e " + MaintenancePort.Last + " para a manutenção. Nada foi alterado.\r\n");
+                    return;
+                }
+                clientPort = plan.ClientPort; maintPort = plan.MaintPort;
+                Append("Porta do sistema do cliente: " + clientPort + " | porta de manutenção: " + maintPort + (plan.Reused ? " (já aplicada antes)" : "") + "\r\n");
+                foreach (string n in plan.Notes) Append("  " + n + "\r\n");
+
                 List<string> changes;
-                newText = MyIniEditor.Apply(cur, mode == Mode.Apply ? MyIniEditor.MaintenanceWithForce(force, MaintPort) : MyIniEditor.RemoveForce(MaintPort), DateTime.Now, out changes);
+                newText = MyIniEditor.Apply(cur, mode == Mode.Apply ? MyIniEditor.MaintenanceWithForce(force, Port()) : MyIniEditor.RemoveForce(Port()), DateTime.Now, out changes);
                 string what = changes.Count == 0 ? "(o my.ini já está assim; só reinicia o serviço)" : string.Join("\r\n", changes.Select(c => "  " + c).ToArray());
-                if (!Confirm("Serviço: " + svcName + "\r\nmy.ini: " + ini + "\r\n\r\nAlterações:\r\n" + what + "\r\n\r\n" +
-                             "O serviço será PARADO e iniciado de novo na porta " + MaintPort + "; o sistema do cliente não conecta nesse período. Continuar?")) { Append("Cancelado.\r\n"); return; }
+                string portInfo = "Porta: o sistema do cliente usa a " + clientPort + "; durante a manutenção o banco fica na " + maintPort + ".\r\n" +
+                                  (plan.Notes.Count > 0 && !plan.Reused ? string.Join("\r\n", plan.Notes.ToArray()) + "\r\n" : "");
+                bool twoSteps = mode == Mode.Apply;
+                if (!Confirm((twoSteps ? "CONFIRMAÇÃO 1 DE 2\r\n\r\n" : "") + "Serviço: " + svcName + "\r\nmy.ini: " + ini + "\r\n\r\n" + portInfo + "\r\nAlterações:\r\n" + what + "\r\n\r\n" +
+                             "O serviço será PARADO e iniciado de novo na porta " + maintPort + "; o sistema do cliente não conecta nesse período. Continuar?")) { Append("Cancelado" + (twoSteps ? " na confirmação 1 de 2" : "") + ".\r\n"); return; }
+                Append("Confirmação 1" + (twoSteps ? " de 2" : "") + ": confirmada.\r\n");
+                if (twoSteps)
+                {
+                    string pc = SystemInfo.HostName();
+                    if (!ConfirmTyped("ÚLTIMA CONFIRMAÇÃO (2 DE 2)\r\n\r\nVai PARAR o serviço " + svcName + " e subir o banco com innodb_force_recovery=" + force + " na porta " + maintPort + ".\r\n" +
+                                      "O sistema do cliente fica SEM conexão com o banco até o reparo terminar e a porta voltar para " + clientPort + ".\r\n\r\n" +
+                                      "Só faça com o cliente fora do movimento, programas fechados e o N2 de acordo.", pc)) { Append("Cancelado na confirmação 2 de 2.\r\n"); return; }
+                    Append("Confirmação 2 de 2: digitou o nome do PC (" + pc + ").\r\n");
+                }
                 foreach (string c in changes) Append("  " + c + "\r\n");
             }
 
@@ -223,33 +264,97 @@ namespace DiagBIG.UI
                     WriteIni(ini, newText, enc, bom); Append("my.ini gravado.\r\n");
                 }
 
-                long errPos = 0;
-                try { if (t.ErrPath != null && File.Exists(t.ErrPath)) errPos = new FileInfo(t.ErrPath).Length; } catch (Exception) { }
-
-                Append("Iniciando o serviço e observando por " + ObserveSeconds + " segundos...\r\n");
-                bool startFailed = false;
-                try { sc.Start(); } catch (Exception ex) { Append("Falha ao iniciar: " + ex.Message + "\r\n"); startFailed = true; }
-
-                DateTime end = DateTime.Now.AddSeconds(ObserveSeconds);
-                bool everRunning = false; int drops = 0; string last = "";
-                ServiceControllerStatus prev = ServiceControllerStatus.Stopped;
-                while (DateTime.Now < end && !startFailed)
+                for (int attempt = 0; ; attempt++)
                 {
-                    Thread.Sleep(500);
-                    ServiceControllerStatus st;
-                    try { sc.Refresh(); st = sc.Status; } catch (Exception) { continue; }
-                    if (st == ServiceControllerStatus.Running) everRunning = true;
-                    if (everRunning && prev == ServiceControllerStatus.Running && st != ServiceControllerStatus.Running) drops++;
-                    prev = st;
-                    string line = st.ToString();
-                    if (line != last) { Append("  " + DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " serviço " + line + "\r\n"); last = line; }
-                    if (st == ServiceControllerStatus.Stopped && !everRunning && (end - DateTime.Now).TotalSeconds < ObserveSeconds - 8) break; // nunca subiu
-                    if (drops >= 2) break;
+                    long errPos = 0;
+                    try { if (t.ErrPath != null && File.Exists(t.ErrPath)) errPos = new FileInfo(t.ErrPath).Length; } catch (Exception) { }
+
+                    Append("Iniciando o serviço" + (mode == Mode.Restore ? "" : " na porta " + maintPort) + " e observando por " + ObserveSeconds + " segundos...\r\n");
+                    bool startFailed = false;
+                    try { sc.Start(); } catch (Exception ex) { Append("Falha ao iniciar: " + ex.Message + "\r\n"); startFailed = true; }
+
+                    DateTime end = DateTime.Now.AddSeconds(ObserveSeconds);
+                    bool everRunning = false; int drops = 0; string last = "";
+                    ServiceControllerStatus prev = ServiceControllerStatus.Stopped;
+                    while (DateTime.Now < end && !startFailed)
+                    {
+                        Thread.Sleep(500);
+                        ServiceControllerStatus st;
+                        try { sc.Refresh(); st = sc.Status; } catch (Exception) { continue; }
+                        if (st == ServiceControllerStatus.Running) everRunning = true;
+                        if (everRunning && prev == ServiceControllerStatus.Running && st != ServiceControllerStatus.Running) drops++;
+                        prev = st;
+                        string line = st.ToString();
+                        if (line != last) { Append("  " + DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " serviço " + line + "\r\n"); last = line; }
+                        if (st == ServiceControllerStatus.Stopped && !everRunning && (end - DateTime.Now).TotalSeconds < ObserveSeconds - 8) break; // nunca subiu
+                        if (drops >= 2) break;
+                    }
+                    bool stable = false;
+                    try { sc.Refresh(); stable = !startFailed && everRunning && drops == 0 && sc.Status == ServiceControllerStatus.Running; } catch (Exception) { }
+
+                    // Não subiu e o .err diz que a porta está ocupada: sobe mais um número e tenta de novo (o serviço já está parado).
+                    if (!everRunning && mode != Mode.Restore && attempt < MaxPortRetries && PortInUse(t.ErrPath, errPos))
+                    {
+                        int next = NextFreePort(maintPort + 1);
+                        if (next > 0)
+                        {
+                            Append("O .err indica que a porta " + maintPort + " está ocupada. Tentando a porta " + next + " (tentativa " + (attempt + 2) + " de " + (MaxPortRetries + 1) + ")...\r\n");
+                            try
+                            {
+                                sc.Refresh();
+                                if (sc.Status != ServiceControllerStatus.Stopped) { sc.Stop(); sc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(60)); }
+                                List<string> again;
+                                string text = MyIniEditor.Apply(ReadIni(ini, out enc, out bom), mode == Mode.Apply ? MyIniEditor.MaintenanceWithForce(force, next.ToString(CultureInfo.InvariantCulture)) : MyIniEditor.RemoveForce(next.ToString(CultureInfo.InvariantCulture)), DateTime.Now, out again);
+                                WriteIni(ini, text, enc, bom);
+                                foreach (string c in again) Append("  " + c + "\r\n");
+                                maintPort = next;
+                                continue;
+                            }
+                            catch (Exception ex) { Append("Não consegui trocar a porta: " + ex.Message + "\r\n"); }
+                        }
+                        else Append("Não achei outra porta livre até " + MaintenancePort.Last + ".\r\n");
+                    }
+                    Report(t, errPos, stable, everRunning, drops, mode);
+                    break;
                 }
-                bool stable = false;
-                try { sc.Refresh(); stable = !startFailed && everRunning && drops == 0 && sc.Status == ServiceControllerStatus.Running; } catch (Exception) { }
-                Report(t, errPos, stable, everRunning, drops, mode);
             }
+        }
+
+        string Port() { return maintPort.ToString(CultureInfo.InvariantCulture); }
+
+        /// <summary>Portas TCP em que algum programa já está escutando neste Windows.</summary>
+        static HashSet<int> ListeningPorts()
+        {
+            var set = new HashSet<int>();
+            try { foreach (System.Net.IPEndPoint ep in System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()) set.Add(ep.Port); }
+            catch (Exception) { }
+            return set;
+        }
+
+        /// <summary>Primeira porta livre a partir de "from" (pula a do cliente e as que têm programa escutando); 0 = nenhuma.</summary>
+        int NextFreePort(int from)
+        {
+            HashSet<int> busy = ListeningPorts();
+            for (int p = from; p <= MaintenancePort.Last; p++)
+                if (p != clientPort && !busy.Contains(p)) return p;
+            return 0;
+        }
+
+        static readonly string[] PortInUseTerms = { "Address already in use", "Do you already have another mysqld server running on port", "Can't start server: Bind on TCP/IP port",
+                                                   "Only one usage of each socket address", "WSAEADDRINUSE" };
+
+        /// <summary>O .err gerado desde errPos fala de porta ocupada?</summary>
+        static bool PortInUse(string errPath, long errPos)
+        {
+            if (errPath == null) return false;
+            try
+            {
+                string txt = ReadErrFrom(errPath, errPos);
+                foreach (string term in PortInUseTerms)
+                    if (txt.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            }
+            catch (Exception) { }
+            return false;
         }
 
         static string ReadErrFrom(string path, long pos)
@@ -299,8 +404,8 @@ namespace DiagBIG.UI
             Append("\r\nRESULTADO\r\n---------\r\n");
             if (mode == Mode.Restore) Append(stable ? "my.ini original restaurado e o serviço subiu e ficou estável.\r\n" : "my.ini original restaurado, mas o serviço NÃO ficou estável: ver o .err.\r\n");
             else if (stable)
-                Append("SUBIU E FICOU ESTÁVEL por " + ObserveSeconds + " s" + (mode == Mode.Apply ? " com force na porta " + MaintPort + ". Próximo: o N2 faz OPTIMIZE/ALTER TABLE nas tabelas abaixo (ainda com force)." :
-                       ". Deixar mais alguns minutos observando o .err; se operar normal, o N2 volta a porta para 3306 e roda bigupdate, acertaestrutura e acertasequenciador.") + "\r\n");
+                Append("SUBIU E FICOU ESTÁVEL por " + ObserveSeconds + " s" + (mode == Mode.Apply ? " com force na porta " + maintPort + ". Próximo: o N2 faz OPTIMIZE/ALTER TABLE nas tabelas abaixo (ainda com force)." :
+                       ". Deixar mais alguns minutos observando o .err; se operar normal, o N2 volta a porta para " + clientPort + " (a do sistema do cliente) e roda bigupdate, acertaestrutura e acertasequenciador.") + "\r\n");
             else if (!everRunning) Append("NÃO SUBIU. " + (mode == Mode.Apply ? "Tentar force 2 (se foi 1). Se não subir com 2: EQUIPE TÉCNICA (não usar 3 ou mais)." : "Voltar o force (botão 1) e repetir o reparo, ou EQUIPE TÉCNICA.") + "\r\n");
             else Append("SUBIU MAS CAIU (" + drops + " queda(s) em " + ObserveSeconds + " s): loop de subir e cair. " + (mode == Mode.Apply ? "Tentar force 2 (se foi 1); se continuar: não é só tabela, EQUIPE TÉCNICA." : "Voltar o force e repetir o reparo; se continuar, EQUIPE TÉCNICA.") + "\r\n");
             if (tables.Count > 0 && mode == Mode.Apply)

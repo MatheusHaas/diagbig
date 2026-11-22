@@ -33,7 +33,7 @@ namespace DiagBIG.UI
             StartPosition = FormStartPosition.CenterParent;
             Size = new Size(860, 560);
             Font = new Font("Segoe UI", 9F);
-            box.Multiline = true; box.ReadOnly = true; box.ScrollBars = ScrollBars.Both; box.WordWrap = false;
+            box.Multiline = true; box.ReadOnly = true; box.ScrollBars = ScrollBars.Vertical; box.WordWrap = true;
             box.Dock = DockStyle.Fill; box.Font = new Font("Consolas", 9.5F); box.BackColor = SystemColors.Window;
             var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, Padding = new Padding(4) };
             cancel.Text = "Cancelar"; cancel.AutoSize = true; cancel.Click += (s, e) => { if (done) Close(); else Cancel(); };

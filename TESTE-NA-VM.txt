@@ -1,5 +1,6 @@
 ﻿DiagBIG - roteiro de teste na VM Windows
-OBS: nesta versao o botao "Manutencao do banco (force 3307)" NAO esta no menu Ferramentas (fica para depois). Pule os testes dele (opcoes 25/26/27 so servem para ele).
+OBS: o botao "Manutencao do banco (force em porta de manutencao)" so existe no DiagBIG.exe compilado com -p:ForceMaint=1 (o exe do DiagBIG-v1.7.0.zip NAO o tem). O DiagBIG.exe desta pasta e o build COM o botao.
+     Nele: porta de manutencao = 3307, ou a proxima livre se o cliente ja usa a 3307; aplicar o force pede DUAS confirmacoes. Testes: secao "BOTAO Manutencao do banco" abaixo (opcoes 25 a 27 e 31 a 34).
 =========================================
 
 Antes de começar
@@ -176,7 +177,7 @@ N) RELATORIO DOS TESTES (para enviar) - 1.7.0
    Simulador: opcao R gera DiagBIG_relatorios\Simulador_relatorio-teste_<data>.txt com o estado do my.ini/servico (27), do WMI (30) e as ultimas 80 linhas do log com os comandos e
    resultados de cada opcao. Rode a R no fim de cada teste (antes da limpeza 26/29) e copie para a pasta compartilhada junto com os Procedimento_*.txt.
 
-N) 1.7.0 - BOTAO "Manutencao do banco (force 3307)" (caso 2, so tabelas) - na VM, DiagBIG.exe com janela, como administrador
+N) 1.7.0 - BOTAO "Manutencao do banco (force em porta de manutencao)" (caso 2, so tabelas) - na VM, DiagBIG.exe com janela, como administrador
    PELO SIMULADOR (simulador\SIMULAR.bat como administrador):
      25  pede SIM e LIMPA os logs Sistema e Aplicativo (tira os eventos de disk 7/153 e Ntfs 55 de testes antigos, senao o caso vira
          TROCAR DISCO); depois grava no .err as tabelas quebradas (loja.movimento, loja.estoque) e poe no my.ini innodb_doublewrite=OFF e
@@ -192,17 +193,36 @@ N) 1.7.0 - BOTAO "Manutencao do banco (force 3307)" (caso 2, so tabelas) - na VM
    Relatorio com servico DESATIVADO: no services.msc colocar o servico do banco em "Desativado" (so numa VM de teste), coletar: na tela essencial
      e no TXT aparece "ATENCAO SERVICO DO BANCO DESATIVADO (<nome>): confirmar se nao consta troca de servidor recente ... e NAO ativar", e no bloco
      do banco a linha "AVISO: ...". O destino (QUEM ACIONAR) nao muda. Voltar o servico para Automatico depois.
-   Sem o simulador: guardar uma copia do my.ini da VM. O botao fica na barra de baixo; pede confirmacao ao abrir e a cada acao.
+   Sem o simulador: guardar uma copia do my.ini da VM. O botao fica em Ferramentas; pede confirmacao ao abrir e a cada acao.
+   DUAS CONFIRMACOES para "1) Aplicar force": (1) caixa "CONFIRMACAO 1 DE 2" com as alteracoes do my.ini e a porta; (2) janela "confirmacao 2 de 2" em que e preciso
+   DIGITAR o nome do PC (nao e senha: e trava contra clique automatico e contra estar na maquina errada). "Confirmar" so habilita com o nome certo (sem diferenciar
+   maiusculas); Cancelar ou Esc cancelam sem parar o servico nem mexer no my.ini. "Tirar o force" e "Restaurar" pedem so uma confirmacao.
    1) Botao "1) Aplicar force e testar subida (30 s)" com force 1: a confirmacao lista as alteracoes (ex.: "innodb_doublewrite=OFF -> innodb_doublewrite=ON",
-      "port=3306 -> port=3307", "(nao definido) -> innodb_force_recovery=1"). Confirmando: cria my.ini.diagbig-original (so na 1a vez), para o servico,
-      grava o my.ini, inicia e mostra "serviço Running" por 30 s. Esperado: "SUBIU E FICOU ESTAVEL por 30 s com force na porta 3307".
+      "port=3306 -> port=3307" com o cliente na 3306 ou "port=3307 -> port=3308" com o cliente na 3307 (o my.ini da VM), "(nao definido) -> innodb_force_recovery=1"). Confirmando: cria my.ini.diagbig-original (so na 1a vez), para o servico,
+      grava o my.ini, inicia e mostra "serviço Running" por 30 s. Esperado: "SUBIU E FICOU ESTAVEL por 30 s com force na porta <a de manutencao>".
       No my.ini ficam comentarios "# DiagBIG dd/mm/aaaa hh:mm: era ..." acima de cada linha trocada. Linhas de [client] nao mudam.
    2) Para simular "nao sobe": colocar innodb_force_recovery=7 (invalido) ou apagar o ibdata1 de uma copia; esperado "NAO SOBE" e a sugestao de force 2/equipe tecnica.
       Colocar no .err (antes de clicar) uma linha "InnoDB: Database page corruption on disk ... table `loja`.`clientes`" nao basta: o botao so le o que o .err
       ganhar DEPOIS do reinicio (use o cenario 3 do simulador e depois o botao: a lista de tabelas aparece se o banco regravar o erro ao subir).
-   3) Botao "2) Tirar o force e testar (porta 3307)": a linha innodb_force_recovery vira comentario "# DiagBIG: removido ...", port=3307 continua. Esperado: "SUBIU E FICOU ESTAVEL".
-   4) Botao "Restaurar my.ini original": volta o my.ini guardado (porta 3306 de novo), reinicia e confirma estavel. Conferir que o sistema/base abre.
+   3) Botao "2) Tirar o force e testar (porta de manutencao)": a linha innodb_force_recovery vira comentario "# DiagBIG: removido ...", a porta de manutencao continua (nao muda). Esperado: "SUBIU E FICOU ESTAVEL".
+   4) Botao "Restaurar my.ini original": volta o my.ini guardado (a porta do cliente de novo), reinicia e confirma estavel. Conferir que o sistema/base abre.
    5) O botao NAO roda OPTIMIZE/ALTER nem bigupdate/acertaestrutura/acertasequenciador: isso continua manual (N2). Tela essencial do caso 2 mostra o roteiro de 8 passos.
+
+   REGRA DA PORTA (o cliente pode usar a 3307): a porta de manutencao nunca pode ser a do cliente, senao o sistema do cliente continua conectando no banco com force.
+   Comeca na 3307 e sobe (3308, 3309...) ate a primeira que nao e a do cliente e nao tem outro programa escutando. Opcoes do simulador: 33 poe o cliente na 3306
+   (copia .bak-porta-diagbig, reinicia o servico), 34 restaura, 31 ocupa a 3307 e a 3308 com listeners, 32 libera. 27 mostra tambem as portas 3306-3310 em escuta.
+   P1) Cliente na 3307 (o my.ini da VM ja esta assim; confira com 27): botao 1 > confirmacao 1 deve dizer "o sistema do cliente usa a 3307; ... o banco fica na 3308"
+       e "Porta 3307 pulada: e a porta que o sistema do cliente usa"; alteracao "port=3307 -> port=3308". Confirmar (2 de 2: digitar o nome do PC).
+       Esperado: SUBIU E FICOU ESTAVEL na porta 3308. 27: port=3308 e comentario "# DiagBIG ...: era port=3307". Botao 2 (tirar force) e force 2 mantem a 3308 (nao viram 3309).
+       Restaurar: port=3307 de novo.
+   P2) Cliente na 3306: opcao 33; botao 1: "port=3306 -> port=3307", SUBIU na 3307 (sem nota de porta pulada). Depois Restaurar e opcao 34.
+   P3) 3307 ocupada: opcoes 33 e 31; botao 1: confirmacao 1 lista "Porta 3307 pulada: ja esta em uso por outro programa" e "Porta 3308 pulada ..." e escolhe a 3309. Opcao 32 libera.
+   P4) Tentar de novo (porta ocupada DEPOIS de escolhida): opcoes 33 e 31 (3307 e 3308 ocupadas, escolhe a 3309); botao 1; confirmar a caixa 1; com a janela "confirmacao 2 de 2"
+       aberta, ocupar a 3309 por fora (socket dual-stack em [::], igual ao mysqld; um listener so IPv4 NAO impede o MariaDB de subir); digitar o nome do PC.
+       Esperado (validado em 22/11/2026): "serviço Stopped", "O .err indica que a porta 3309 esta ocupada. Tentando a porta 3310 (tentativa 2 de 4)", port=3309 -> port=3310,
+       "SUBIU E FICOU ESTAVEL ... na porta 3310". Restaurar volta o my.ini original.
+   P5) Segunda confirmacao: digitar o nome errado deixa "Confirmar" desabilitado; Cancelar/Esc mostra "Cancelado na confirmacao 2 de 2." e o servico NAO e parado nem o my.ini muda.
+   Ao terminar: opcao 26 (limpa tudo: restaura o my.ini, encerra listeners) e confira com 27. Os Procedimento_manutencao-banco-*.txt registram as portas, as notas e as duas confirmacoes.
 
 N) 1.7.0 - BOTAO "Reparar WMI (repositorio)" e linha REPOSITORIO WMI - simulador\SIMULAR.bat como administrador
    Procedimento do botao = o manual do N1/N2: net stop winmgmt /y, renomear wbem\Repository para OLD_Repository_AAAAMMDD_HHMM, winmgmt /resetRepository,
