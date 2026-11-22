@@ -13,7 +13,7 @@
     <ApplicationIcon>Resources\diagbig.ico</ApplicationIcon>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <Version>1.7.0</Version>
+    <Version>1.7.1</Version>
     <Product>DiagBIG</Product>
     <Description>Coletor de logs de disco e banco para o suporte</Description>
     <!-- Sem DiagBIG.exe.config: um único .exe (o runtime v4 já é o padrão do assembly). -->
@@ -22,8 +22,8 @@
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
 
-  <!-- Botão "Manutenção do banco (force 3307)": fora da versão atual. Para incluir: dotnet build -p:ForceMaint=1 -->
-  <PropertyGroup Condition="'$(ForceMaint)' == '1'">
+  <!-- Botão "Manutenção do banco (force em porta de manutenção)": incluído por padrão desde a 1.7.1. Para compilar SEM ele: dotnet build -p:ForceMaint=0 -->
+  <PropertyGroup Condition="'$(ForceMaint)' != '0'">
     <DefineConstants>$(DefineConstants);FORCE_MAINT</DefineConstants>
   </PropertyGroup>
 

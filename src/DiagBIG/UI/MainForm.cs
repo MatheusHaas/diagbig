@@ -92,7 +92,7 @@ namespace DiagBIG.UI
             wmi.Text = "Reparar WMI (repositório)"; wmi.Click += (s, e) => RunWmi();
             toolsMenu.Items.AddRange(new ToolStripItem[] { chkdsk, memtest });
 #if FORCE_MAINT
-            toolsMenu.Items.Add(maint); // botão de manutenção do banco (force 3307): fora desta versão; compilar com -p:ForceMaint=1
+            toolsMenu.Items.Add(maint); // botão de manutenção do banco (force 1 ou 2 em porta de manutenção); compilar com -p:ForceMaint=0 para tirar
 #endif
             toolsMenu.Items.Add(wmi);
             Setup(tools, "Ferramentas \u25BE", (s, e) => toolsMenu.Show(tools, new Point(0, tools.Height)));

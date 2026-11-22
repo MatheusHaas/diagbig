@@ -21,7 +21,7 @@ if not exist "%DIAG%" set DIAG=%~dp0DiagBIG.exe
 
 :menu
 echo.
-echo ===== SIMULADOR DiagBIG 1.7.0 =====
+echo ===== SIMULADOR DiagBIG 1.7.1 =====
 echo  Eventos do Windows:
 echo   1 - Disco: bad block (disk 7, com ID Harddisk0\DR0)   -^> TROCAR DISCO
 echo   2 - NTFS 55 com "volume ??" (sem unidade)               -^> Unidade NAO INFORMADA

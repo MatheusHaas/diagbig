@@ -271,8 +271,10 @@ bloco curto do caso. Os 8 casos:
      porta de manutenção e observar; se operar normal, voltar a porta original
      do cliente (em geral 3306) e rodar bigupdate.exe, acertaestrutura.exe e
      acertasequenciador.exe. Falhou: equipe técnica.
-     Nesta versão não há botão para o my.ini/force: o N2 faz esses passos à
-     mão (um botão de manutenção do banco fica para uma versão futura).
+     O botão Ferramentas > "Manutenção do banco" faz os passos do my.ini/force
+     e da subida do serviço: porta de manutenção 3307 (ou a próxima livre, se
+     o cliente já usa a 3307), force 1 ou 2, duas confirmações (a segunda é
+     digitar o nome do PC), observação de 30 s e botão para restaurar o my.ini.
      OPTIMIZE/ALTER e os três programas continuam com o N2.
 
 REPOSITÓRIO DO WMI (erros aleatórios do Windows, ex.: dclvendas.exe no bigupdate)

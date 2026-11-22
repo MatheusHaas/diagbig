@@ -1,5 +1,5 @@
 ﻿DiagBIG - roteiro de teste na VM Windows
-OBS: o botao "Manutencao do banco (force em porta de manutencao)" so existe no DiagBIG.exe compilado com -p:ForceMaint=1 (o exe do DiagBIG-v1.7.0.zip NAO o tem). O DiagBIG.exe desta pasta e o build COM o botao.
+OBS: a partir da 1.7.1 o DiagBIG.exe ja traz o botao "Manutencao do banco (force em porta de manutencao)" (o exe do DiagBIG-v1.7.0.zip NAO o tem).
      Nele: porta de manutencao = 3307, ou a proxima livre se o cliente ja usa a 3307; aplicar o force pede DUAS confirmacoes. Testes: secao "BOTAO Manutencao do banco" abaixo (opcoes 25 a 27 e 31 a 34).
 =========================================
 

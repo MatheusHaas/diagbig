@@ -23,6 +23,7 @@ Coletor de logs de **disco**, **reinícios/energia** e **banco MySQL/MariaDB** p
 | **Mostrar relatório completo / só o essencial** | Alterna a tela entre o essencial do caso (`ReportBuilder.BuildEssential`) e o relatório inteiro |
 | **Abrir TXT** / **Abrir pasta** | Abre o relatório salvo / a pasta com ele selecionado |
 | **Ajuda (F1)** | Manual do N1 dentro do programa |
+| **Ferramentas > Manutenção do banco** (1.7.1) | Caso "só tabelas" (N2): ajusta o `my.ini` (force 1 ou 2, doublewrite ON, flush 1) numa **porta de manutenção** (3307, ou a próxima livre se o cliente já usa a 3307), reinicia o serviço e observa 30 s. Aplicar o force pede duas confirmações (a segunda é digitar o nome do PC). Guarda o `my.ini` original e tem botão para restaurar. Para compilar sem ele: `-p:ForceMaint=0` |
 | `DiagBIG.exe --sem-janela [--dias 7\|30\|90]` | Gera só o TXT e sai (automação; código 0 = gravou) |
 
 O relatório vai para `DiagBIG_relatorios\DiagBIG_<PC>_<aaaaMMdd_HHmmss>.txt`, ao lado do .exe (ou na Área de Trabalho). Ficam os 10 mais recentes de cada PC.
