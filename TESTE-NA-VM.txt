@@ -77,10 +77,12 @@ Antes de começar
 
 5) Reinícios e desligamentos
    5a) Reinicie a VM normalmente (Iniciar > Reiniciar) e colete. Na seção "2. REINÍCIOS E DESLIGAMENTOS",
-       a LINHA DO TEMPO deve mostrar, do mais recente para o mais antigo:
+       o bloco LIGA/DESLIGA AGRUPADO deve mostrar (cada tipo com "1x" e os horários):
          LIGOU (Windows iniciou)            EventLog 6005
          DESLIGOU CORRETAMENTE              EventLog 6006
-         DESLIGAR/REINICIAR SOLICITADO      User32 1074  (com processo, usuário e motivo)
+         DESLIGAR/REINICIAR SOLICITADO      User32 1074, com uma linha "dd/mm/aaaa hh:mm: usuário ...; processo ...;
+                                            tipo: ...; motivo: ...; comentário: ..." por evento (1.7.2)
+       Atalho: simulador opção 35 grava um 1074 de teste (usuário tecnico, comentário "teste DiagBIG").
        Com "Desligar" (não Reiniciar) no Windows 10/11 com Inicialização Rápida, aparecem SUSPENSÃO/VOLTOU
        em vez de LIGOU/DESLIGOU. Está explicado no próprio TXT.
    5b) Desligue a VM à força pelo hipervisor ("Desligar a máquina" / "Desligar", sem desligar o Windows),
@@ -117,7 +119,7 @@ Antes de começar
      Em VMware a controladora "LSI Adapter, SAS ..." (driver lsi_sas) NÃO pode aparecer como RAID.
    - SMART: NÃO VERIFICADO (VM).
    - Reinicie pelo menu Iniciar: o Windows Server pede um motivo e um comentário. Escreva "teste DiagBIG".
-     Coletar: a LINHA DO TEMPO mostra DESLIGAR/REINICIAR SOLICITADO (User32 1074) com o usuário,
+     Coletar: o bloco LIGA/DESLIGA AGRUPADO mostra DESLIGAR/REINICIAR SOLICITADO (User32 1074) com o usuário,
      o motivo e o comentário "teste DiagBIG", e depois DESLIGOU CORRETAMENTE / LIGOU.
    - Num servidor real com RAID (Dell PERC, HP Smart Array): RAID: SIM — controladora ... (driver ...),
      e o SMART explica que os discos devem ser vistos na ferramenta da controladora.

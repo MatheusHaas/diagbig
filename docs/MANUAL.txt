@@ -108,9 +108,10 @@ DESLIGAMENTOS INESPERADOS
 
 LIGA/DESLIGA
   Quantas vezes o PC ligou, desligou certo, foi reiniciado por alguém e caiu,
-  e desde quando está ligado. A LINHA DO TEMPO mostra data e hora de cada
-  evento e, nos reinícios pedidos (User32 1074), qual usuário ou programa
-  pediu (ex.: Windows Update).
+  e desde quando está ligado. O bloco LIGA/DESLIGA AGRUPADO junta os
+  eventos repetidos com a lista de horários e, nos reinícios pedidos
+  (User32 1074), mostra uma linha por evento com o usuário, o programa, o
+  motivo e o comentário (ex.: Windows Update, ou o técnico que reiniciou).
   Obs.: no Windows 10/11 com Inicialização Rápida, "Desligar" aparece como
   SUSPENSÃO / VOLTOU DA SUSPENSÃO, e não como LIGOU / DESLIGOU.
 

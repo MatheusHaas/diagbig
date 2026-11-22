@@ -21,7 +21,7 @@ if not exist "%DIAG%" set DIAG=%~dp0DiagBIG.exe
 
 :menu
 echo.
-echo ===== SIMULADOR DiagBIG 1.7.1 =====
+echo ===== SIMULADOR DiagBIG 1.7.2 =====
 echo  Eventos do Windows:
 echo   1 - Disco: bad block (disk 7, com ID Harddisk0\DR0)   -^> TROCAR DISCO
 echo   2 - NTFS 55 com "volume ??" (sem unidade)               -^> Unidade NAO INFORMADA
@@ -64,6 +64,8 @@ echo  33 - CLIENTE NA 3306: troca port= por 3306 no my.ini (guarda copia, reinic
 echo  31 - OCUPAR as portas 3307 e 3308 com listeners (cliente na 3306: o botao deve escolher a 3309)
 echo  32 - LIBERAR as portas (encerra os listeners)
 echo  34 - RESTAURAR o my.ini que o 33 guardou (porta do cliente de volta)
+echo  Detalhe do reinicio solicitado (1.7.2):
+echo  35 - Grava User32 1074 com usuario, motivo e comentario   -^> aparece sob DESLIGAR/REINICIAR SOLICITADO
 echo   N - OS 8 CASOS DO N1 EM SEQUENCIA (limpa os logs, usa --dias 7, confere QUEM ACIONAR, restaura)
 echo   T - TODOS DE UMA VEZ: 14, 15, 16, 18, 6, 10, 12, coleta, mostra tudo e restaura (11, 9, 19, 17)
 echo  Coleta e limpeza:

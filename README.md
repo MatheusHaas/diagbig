@@ -200,13 +200,15 @@ RESUMO
 [10/11/2026 08:01:50] Microsoft-Windows-Kernel-Power ID 41
     Interpretação: sem tela azul e sem botão de energia: provável QUEDA/CORTE DE ENERGIA, reset ou travamento total
 
->>> LINHA DO TEMPO DE LIGA/DESLIGA (MAIS RECENTE PRIMEIRO)
-  10/11/2026 08:02:01  DESLIGAMENTO INESPERADO        EventLog 6008
-                         O desligamento anterior do sistema às 19:44:10 em 09/11/2026 foi inesperado.
-  10/11/2026 08:02:00  LIGOU (Windows iniciou)        EventLog 6005
-  08/11/2026 22:00:05  DESLIGOU CORRETAMENTE          EventLog 6006
-  08/11/2026 22:00:00  DESLIGAR/REINICIAR SOLICITADO  User32 1074
-                         O processo C:\Windows\system32\winlogon.exe (CAIXA01) iniciou a reinicialização ... em nome do usuário CAIXA01\caixa
+>>> LIGA/DESLIGA AGRUPADO (MAIS RECENTE PRIMEIRO)
+     1x  LIGOU (Windows iniciou) (EventLog 6005)
+          horários: 10/11 08:02
+     1x  DESLIGOU CORRETAMENTE (EventLog 6006)
+          horários: 08/11 22:00
+     1x  DESLIGAR/REINICIAR SOLICITADO (User32 1074)
+          horários: 08/11 22:00
+          08/11/2026 22:00: usuário CAIXA01\caixa; processo winlogon.exe; tipo: reiniciar;
+          motivo: Outro (planejado); comentário: teste
 ```
 
 ### 7. A janela

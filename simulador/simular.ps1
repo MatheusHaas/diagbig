@@ -251,6 +251,12 @@ function Porta-Cliente-Restaurar {
         Com-Servico { Copy-Item ($f + ".bak-porta-diagbig") $f -Force; Remove-Item ($f + ".bak-porta-diagbig"); Write-Host "Restaurado: $f" }
     } else { Write-Host "Nada para restaurar." }
 }
+# 35: grava um User32 1074 de reinicio com usuario, motivo e comentario (o relatorio deve mostrar o detalhe sob "horarios").
+function Reinicio-1074 {
+    $msg = "O processo C:\Windows\system32\shutdown.exe ($env:COMPUTERNAME) iniciou a reinicialização do computador $env:COMPUTERNAME em nome de $env:COMPUTERNAME\tecnico pelo seguinte motivo: Outro (planejado)`r`n Código do motivo: 0x80000000`r`n Tipo de desligamento: reiniciar`r`n Comentário: teste DiagBIG"
+    Write-EventLog -LogName System -Source User32 -EventId 1074 -EntryType Information -Message $msg
+    Write-Host "Evento User32 1074 gravado. Colete: a secao 2 deve mostrar 'usuario ...tecnico; processo shutdown.exe; tipo: reiniciar; motivo: Outro (planejado); comentario: teste DiagBIG'."
+}
 $PortaPidArq = Join-Path $env:TEMP "diagbig-listener.pid"
 # 32: encerra os listeners do 31.
 function Porta-Liberar {
@@ -439,5 +445,6 @@ switch ($Cenario) {
  32 { Porta-Liberar }
  33 { Porta-Cliente3306 }
  34 { Porta-Cliente-Restaurar }
+ 35 { Reinicio-1074 }
  default { Write-Host "Cenario invalido." }
 }

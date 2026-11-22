@@ -133,9 +133,50 @@ namespace DiagBIG.Core
                 sb.Append(string.Format(CultureInfo.InvariantCulture, "  {0,4}x  {1} ({2} {3})", g.Count(), Label(g.Key.k), g.Key.Src, g.Key.Id)).Append(ReportBuilder.NL);
                 if (g.Key.Det.Length > 0) ReportBuilder.AppendWrapped(sb, g.Key.Det, "          ");
                 ReportBuilder.AppendWrapped(sb, "horários: " + Grouping.TimesText(g.Select(x => x.o.Time), Config.MaxTimesPerGroup), "          ");
+                if (g.Key.k == PowerKind.Requested)
+                {
+                    // 1074: quem pediu, por quê e o comentário (os mais recentes).
+                    foreach (var x in g.OrderByDescending(y => y.o.Time ?? DateTime.MinValue).Take(Config.MaxTimesPerGroup))
+                    {
+                        string d = Describe1074(x.o.Message);
+                        if (d.Length == 0) continue;
+                        ReportBuilder.AppendWrapped(sb, (x.o.Time == null ? "(sem horário)" : ReportBuilder.DateTimeLong(x.o.Time)) + ": " + d, "          ");
+                    }
+                }
                 lines.Add(sb.ToString().TrimEnd('\r', '\n'));
             }
             return lines;
+        }
+
+        static string Grab(string msg, string pattern)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(msg ?? "", pattern,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+            return m.Success ? m.Groups[1].Value.Trim() : "";
+        }
+
+        /// <summary>
+        /// Resume a mensagem do User32 1074 (pt-BR ou inglês): processo, usuário, motivo, tipo e comentário.
+        /// Se não reconhecer nada, devolve a mensagem em uma linha.
+        /// </summary>
+        public static string Describe1074(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return "";
+            const string stop = @"(?=\s*(?:C[oó]digo do motivo|Reason Code|Tipo de (?:desligamento|encerramento)|Shutdown Type|Coment[aá]rio|Comment)\s*:|$)";
+            string proc = Grab(message, @"(?:processo|process)\s+(\S.*?)\s+\(");
+            int cut = proc.LastIndexOfAny(new[] { '\\', '/' });
+            if (cut >= 0) proc = proc.Substring(cut + 1);
+            string user = Grab(message, @"(?:em nome d[eo]s?\s+(?:usu[aá]rio\s+)?|pel[oa]\s+usu[aá]rio\s+|on behalf of user\s+|by user\s+)(\S+)");
+            string reason = Grab(message, @"(?:seguinte motivo|este motivo|following reason|this reason)\s*:\s*(.*?)" + stop);
+            string type = Grab(message, @"(?:Tipo de (?:desligamento|encerramento)|Shutdown Type)\s*:\s*(.*?)" + stop);
+            string comment = Grab(message, @"(?:Coment[aá]rio|Comment)\s*:\s*(.*)$");
+            var parts = new List<string>();
+            if (user.Length > 0) parts.Add("usuário " + user);
+            if (proc.Length > 0) parts.Add("processo " + proc);
+            if (type.Length > 0) parts.Add("tipo: " + ReportBuilder.OneLine(type, 40));
+            if (reason.Length > 0) parts.Add("motivo: " + ReportBuilder.OneLine(reason, 100));
+            if (comment.Length > 0) parts.Add("comentário: " + ReportBuilder.OneLine(comment, 100));
+            return parts.Count > 0 ? string.Join("; ", parts.ToArray()) : ReportBuilder.OneLine(message, 200);
         }
 
         static string Detail(PowerKind k, string message)
