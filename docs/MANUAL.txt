@@ -11,8 +11,9 @@ sinais de problema em:
   - MEMÓRIA RAM E HARDWARE (erros WHEA, teste de memória, pentes instalados)
   - BANCO MySQL/MariaDB (erros do arquivo .err)
 
-Ele SÓ LÊ. Não altera nada no Windows, nos serviços nem no banco, e não
-conecta no MySQL. Pode rodar com o sistema do cliente aberto.
+A coleta SÓ LÊ. Não altera nada no Windows, nos serviços nem no banco, e não
+conecta no MySQL. Só o menu Ferramentas (Manutenção do banco, Reparar WMI,
+chkdsk, Testar memória) altera algo, e sempre depois de pedir confirmação. Pode rodar com o sistema do cliente aberto.
 
 
 COMO USAR (PASSO A PASSO)
@@ -295,7 +296,9 @@ bigupdate, acertaestrutura e acertasequenciador.
   4. Banco danificado além de tabelas, sem disco ruim ... EQUIPE TÉCNICA:
      reinstalar no mesmo terminal.
   5. Reparo do Windows (tela azul de driver, DISM, eventos sem dano no banco)
-     ........................... N2 SISTEMA: DISM e SFC.
+     ........................... N1, N2 e EQUIPE TÉCNICA: o N1 coleta e aciona;
+     o N2 SISTEMA faz DISM e SFC; a EQUIPE TÉCNICA entra se o N2 não resolver
+     ou após as 20:00.
   6. Só queda de energia ........ TÉCNICO DA FARMÁCIA: no-break, fonte, tomada,
      bateria da placa-mãe.
   7. Pouco espaço em disco, ou só data/hora errada do Windows ... o próprio N1
@@ -340,5 +343,5 @@ PARA O SUPORTE TÉCNICO
 Precisa do .NET Framework 4 (Windows 7 SP1 em diante; Windows 10/11 já têm).
 Windows Server: 2012 em diante funciona direto; 2008/2008 R2 precisam do
 .NET 4 instalado; no 2003 o log de eventos não pode ser lido (só o .err).
-No Windows Server, todo reinício aparece na linha do tempo com o motivo
-informado por quem reiniciou (User32 1074).
+No Windows Server, todo reinício aparece no bloco LIGA/DESLIGA AGRUPADO com o
+usuário, o programa, o motivo e o comentário de quem reiniciou (User32 1074).

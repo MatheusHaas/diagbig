@@ -2,7 +2,7 @@
 
 Coletor de logs de **disco**, **reinícios/energia** e **banco MySQL/MariaDB** para o suporte. Um único `.exe` para Windows: o N1 abre no PC do cliente, espera alguns segundos e cola o resumo no caso.
 
-> Somente leitura: não altera nada no Windows, nos serviços, no log de eventos nem no banco, e não conecta no MySQL.
+> A **coleta é somente leitura**: não altera nada no Windows, nos serviços, no log de eventos nem no banco, e não conecta no MySQL. Só o menu **Ferramentas** (Manutenção do banco, Reparar WMI, chkdsk, Testar memória) altera algo, sempre depois de pedir confirmação.
 
 ---
 
@@ -254,20 +254,22 @@ Grava em `DiagBIG_relatorios\` (ao lado do .exe ou na Área de Trabalho) e mant�
 ```text
 src/DiagBIG/
   Core/        lógica pura (testada): Config, ImagePathParser, MyIniParser, DbPathResolver,
-               ErrTailReader, ErrLogAnalyzer, PowerEvents, Storage, Grouping, ReportBuilder, WinPath
+               ErrTailReader, ErrLogAnalyzer, PowerEvents, Storage, Grouping, ReportBuilder, WinPath, ActionPlan, MaintenancePort, MyIniEditor, WmiRepo
   Windows/     Collector (orquestra), EventLogs, DbDiscovery, SystemInfo (SMART, boot, unidades)
-  UI/          MainForm, HelpForm
+  UI/          MainForm, HelpForm, MaintenanceForm, ConfirmTypeForm, WmiRepairForm, ChkdskForm
   Resources/   diagbig.ico
   app.manifest
 tests/DiagBIG.Tests/   xUnit em net8.0 compilando os mesmos arquivos de Core/
 amostras/              .err falsos (MySQL 4, MySQL 5.1, MariaDB 10.4, MySQL 8) e my.ini de exemplo
 docs/MANUAL.txt        manual do N1 (botão Ajuda)
 TESTE-NA-VM.txt        roteiro de teste manual no Windows
+simulador/             SIMULAR.bat + simular.ps1: cria cada cenário (disco, banco, energia, relógio, WMI, porta) na VM
+ESPECIFICACAO_DiagBIG.md   pedido inicial + o que foi construído depois
 ```
 
 ## Testes
 
-- **132 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath (inclusive executáveis do MySQL 4 e `mysqld` sem `.exe` do 5.1), my.ini (WinMySQLadmin do MySQL 4, instalador do 5.1, ordem de leitura), regras do `.err` (inclusive `mysql.err`), datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, regra de eventos de disco e detecção de RAID (incluindo os falsos positivos de VM e de Intel RST), retenção de relatórios e o manual citando todos os itens do RESUMO.
+- **258 testes** xUnit (`dotnet test`) sobre a lógica de `Core/`: ImagePath (inclusive executáveis do MySQL 4 e `mysqld` sem `.exe` do 5.1), my.ini (WinMySQLadmin do MySQL 4, instalador do 5.1, ordem de leitura), regras do `.err` (inclusive `mysql.err`), datas nos três formatos (inclusive UTC → local), herança de data, contexto de crash, período, agrupamento, resumo de três estados, montagem do TXT, limite do resumo, leitura do final do arquivo com ele aberto por outro processo, UTF-8/Windows-1252, eventos de energia, regra de eventos de disco e detecção de RAID (incluindo os falsos positivos de VM e de Intel RST), retenção de relatórios e o manual citando todos os itens do RESUMO.
 - As **amostras** em `amostras/` são usadas diretamente pelos testes.
 - O que depende do Windows (EventLog, WMI, registro, janela) é testado à mão com o roteiro [`TESTE-NA-VM.txt`](TESTE-NA-VM.txt): disco com `Write-EventLog`, `.err` com linhas injetadas, `.err` renomeado/ausente, reinício normal e desligamento forçado da VM, modo sem janela e botões.
 
@@ -279,6 +281,42 @@ Tudo o que é ajustável está em [`src/DiagBIG/Core/Config.cs`](src/DiagBIG/Cor
 
 - **SMART** clássico não funciona em VM, em boa parte dos RAIDs e em alguns NVMe; nos NVMe o DiagBIG tenta os contadores de confiabilidade e só fica `NÃO VERIFICADO` se eles também não existirem (VM, RAID).
 - O DiagBIG **não roda teste de memória**: ele só lê o que o Windows já registrou. Sem `mdsched`/MemTest86 feito, a RAM só é suspeita por indício.
-- Com **Inicialização Rápida**, "Desligar" não aparece como desligamento na linha do tempo (é hibernação).
+- Com **Inicialização Rápida**, "Desligar" não aparece como desligamento no bloco LIGA/DESLIGA (é hibernação).
 - O `.err` é lido só nos **últimos 10 MB**; o cabeçalho mostra até onde a leitura alcançou.
 - Se o log do Windows foi sobrescrito ou limpo, o período anterior não existe mais; o relatório avisa.
+
+## Os 8 casos do N1 (resumo)
+
+| # | Caso | Quem aciona |
+|---|---|---|
+| 1 | Nada encontrado | ninguém |
+| 2 | Só tabelas danificadas | N2 sistema (force 1 ou 2 na porta de manutenção; após as 20:00, equipe técnica) |
+| 3 | Disco com defeito | equipe técnica (trocar disco/servidor) |
+| 4 | Banco danificado além de tabelas | equipe técnica (reinstalar) |
+| 5 | Reparo do Windows | N1, N2 e equipe técnica (o N1 coleta e aciona; o N2 faz DISM e SFC; equipe técnica se o N2 não resolver ou após as 20:00) |
+| 6 | Só queda de energia | técnico da farmácia (no-break, fonte, tomada, bateria da placa-mãe) |
+| 7a | Pouco espaço em disco | o próprio N1 |
+| 7b | Data/hora errada do Windows | o próprio N1 (se voltar a errar: técnico da farmácia, bateria CR2032) |
+
+## Passo a passo para o suporte
+
+1. **Coletar:** o N1 abre o `DiagBIG.exe` no PC do cliente (ou o servidor do banco), aceita o UAC e espera a coleta.
+2. **Ler a tela essencial:** QUEM ACIONAR e PARA O N1 dizem o que fazer. **Copiar resumo** (até 3.500 caracteres) cola no caso; **Mostrar relatório completo** e **Abrir TXT** trazem tudo.
+3. **Acionar:** conforme a tabela dos 8 casos. O N2 segue o roteiro do relatório (`ActionPlan`) e usa **Ferramentas > Manutenção do banco** no caso "só tabelas".
+4. **Manutenção do banco (N2):** aplicar o force pede duas confirmações (a segunda é digitar o nome do PC). Porta 3307, ou a próxima livre se o cliente já a usa. Depois **Tirar o force** e, por fim, **Restaurar** o `my.ini` original. Rodar `bigupdate`, `acertaestrutura` e `acertasequenciador`.
+5. **Reparar WMI:** fora do movimento, quando o relatório avisar "ATENÇÃO WMI".
+6. **Automação / suporte técnico:** `DiagBIG.exe --sem-janela [--dias 7|30|90]` gera só o TXT.
+
+## Histórico de versões
+
+| Versão | O que entrou |
+|---|---|
+| 1.3.1 | Coletor de disco, energia e MySQL/MariaDB; resumo de três estados |
+| 1.4.0 | MySQL 4 e 5.1 |
+| 1.5.0 – 1.5.4 | Windows Server e RAID; causas prováveis, tela azul, memória, avisos do `my.ini`, bad block, Ntfs 55, banco que não sobe |
+| 1.6.0 – 1.6.2 | ONDE ESTÁ O PROBLEMA; O QUE FAZER (trocar disco x reparar); `dism.log`/`CBS.log`; botão chkdsk |
+| 1.6.3 | Bloco PARA O N1 (N2 / equipe técnica); ocorrências agrupadas com horários; 6008 junto do Kernel-Power 41 |
+| 1.6.4 – 1.6.8 | Testar memória (mdsched); unidade/disco nos eventos; avisos de relógio e `my.ini`; mapa do disco físico; banco recém-instalado já corrompendo |
+| 1.7.0 | Tela essencial por caso; Manutenção do banco; Reparar WMI; menu Ferramentas; relatórios por procedimento |
+| 1.7.1 | Botão de manutenção incluído por padrão (porta 3307 ou a próxima livre, duas confirmações); quebra de linha nas telas e relatórios |
+| 1.7.2 | LIGA/DESLIGA agrupado mostra usuário, processo, tipo, motivo e comentário do User32 1074 |
