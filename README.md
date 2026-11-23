@@ -262,7 +262,7 @@ src/DiagBIG/
 tests/DiagBIG.Tests/   xUnit em net8.0 compilando os mesmos arquivos de Core/
 amostras/              .err falsos (MySQL 4, MySQL 5.1, MariaDB 10.4, MySQL 8) e my.ini de exemplo
 docs/MANUAL.txt        manual do N1 (botão Ajuda)
-docs/guia/             guia ilustrado em PDF e PowerPoint (como funciona e cada botão)
+docs/guia/             guia ilustrado em PDF (padrão da empresa); o PowerPoint vai só na release (91 MB)
 TESTE-NA-VM.txt        roteiro de teste manual no Windows
 simulador/             SIMULAR.bat + simular.ps1: cria cada cenário (disco, banco, energia, relógio, WMI, porta) na VM
 ESPECIFICACAO_DiagBIG.md   pedido inicial + o que foi construído depois
